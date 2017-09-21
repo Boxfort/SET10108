@@ -14,12 +14,12 @@ void increment(shared_ptr<int> value)
 	// Loop 1 million times incrementing value
 	for (unsigned int i = 0; i < 1000000; ++i)
 	{
-		// Aquire the lock
-		mut.lock();
+		// Create a lock guard which automatically aqures a mutex
+		lock_guard<mutex> lock(mut);
 		// Increment value
 		*value = *value + 1;
-		// Release the lock
-		mut.unlock();
+		//Lock guard is automatically destroyed at the end of the loop scope
+		//This will release the lock.
 	}
 }
 
