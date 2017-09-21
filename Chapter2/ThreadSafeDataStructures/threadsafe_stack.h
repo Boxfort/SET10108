@@ -15,7 +15,7 @@ public:
 	// Normal Constructor
 	threadsafe_stack() { }
 	// Copy constructor
-	threadsafe_stack(const threadsafe stack &other)
+	threadsafe_stack(const threadsafe_stack &other)
 	{
 		// We need to copy the data from the other stack. Lock other stack
 		std::lock_guard<std::mutex> lock(other.mut);
