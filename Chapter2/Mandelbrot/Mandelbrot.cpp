@@ -14,9 +14,10 @@ using namespace std;
 // Number of iterations to find each pixel value.
 const unsigned int MAX_ITERATIONS = 1000;
 // Dimension of the image to generate (in pixels)
-const unsigned int DIMENSION = 1024; //32768;
-
+const unsigned int DIMENSION = 32768;
 const unsigned int SPLIT_AMOUNT = 4;
+const unsigned int SUB_DIMENSION = DIMENSION / SPLIT_AMOUNT;
+
 
 const int BPP = 24;
 
@@ -43,7 +44,8 @@ vector<double> mandelbrot(unsigned int start_y, unsigned int end_y, unsigned int
 	y = Y_MIN + (start_y * INTEGRAL_Y);
 	for (unsigned int y_coord = start_y; y_coord < end_y; ++y_coord)
 	{
-		x = X_MIN;
+		//x = X_MIN + (((Y_MAX - Y_MIN) / SPLIT_AMOUNT) * xblock);
+		x = X_MIN + (start_x * INTEGRAL_X);
 		// Loop through each pixel on the line.
 		for (unsigned int x_coord = start_x; x_coord < end_x; ++x_coord)
 		{
@@ -71,13 +73,13 @@ vector<double> mandelbrot(unsigned int start_y, unsigned int end_y, unsigned int
 	return results;
 }
 
-void save_image(vector<vector<double>>* image_data, unsigned int dimension,  const char* filename)
+void save_image(vector<vector<double>>* image_data, const char* filename)
 {
 	cout << "Creating file: " << filename << ".png" << endl;
 
 	FreeImage_Initialise();
 
-	FIBITMAP* bitmap = FreeImage_Allocate(dimension, dimension, BPP);
+	FIBITMAP* bitmap = FreeImage_Allocate(SUB_DIMENSION, SUB_DIMENSION, BPP);
 	RGBQUAD color;
 
 	if (!bitmap)
@@ -93,14 +95,14 @@ void save_image(vector<vector<double>>* image_data, unsigned int dimension,  con
 		}
 	}
 
-	for (int x = 0; x < dimension; x++)
+	for (int x = 0; x < SUB_DIMENSION; x++)
 	{
-		for (int y = 0; y < dimension; y++)
+		for (int y = 0; y < SUB_DIMENSION; y++)
 		{
 			
-			color.rgbRed = pixel_data[x + (y * dimension)] * 255;
-			color.rgbBlue = pixel_data[x + (y * dimension)] * 255;
-			color.rgbGreen = pixel_data[x + (y * dimension)] * 255;
+			color.rgbRed = pixel_data[x + (y * SUB_DIMENSION)] * 255;
+			color.rgbBlue = pixel_data[x + (y * SUB_DIMENSION)] * 255;
+			color.rgbGreen = pixel_data[x + (y * SUB_DIMENSION)] * 255;
 			FreeImage_SetPixelColor(bitmap, x, y, &color);
 		}
 	}
@@ -130,6 +132,12 @@ int main()
 			int start_y = sub_dimension * j;
 			int end_y = (j + 1) * sub_dimension;
 
+			cout << "Start x : " << start_x << endl;
+			cout << "end x : " << end_x << endl;
+			cout << "Start y : " << start_y << endl;
+			cout << "end y : " << end_y << endl;
+
+
 			// Determine strip height
 			auto strip_height = sub_dimension / num_threads;
 
@@ -139,6 +147,8 @@ int main()
 			{
 				//Range is used to determine number of values to process
 				futures.push_back(async(mandelbrot, (i * strip_height) + start_y, ((i + 1) * strip_height) + start_y, start_x, end_x));
+
+				cout << "ystart calc " << (i * strip_height) + start_y << endl;
 			}
 
 			vector<vector<double>> results;
@@ -150,11 +160,15 @@ int main()
 
 			string filename = "Mandelbrot" + to_string(i) + to_string(j) + ".png";
 
-			save_image(&results, sub_dimension,filename.c_str());
+			save_image(&results, filename.c_str());
 
 			results.clear();
 		}
 	}
+
+	int a;
+
+	cin >> a;
 
     return 0;
 }
