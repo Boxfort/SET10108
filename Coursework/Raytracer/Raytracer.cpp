@@ -34,31 +34,47 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 
 struct vec
 {
-	double x, y, z;
+	__m128 *components;
 
-	vec(double x = 0, double y = 0, double z = 0) noexcept
-		: x(x), y(y), z(z)
+	//Working.
+	vec(float x = 0, float y = 0, float z = 0) noexcept
 	{
+		components = (__m128*)_aligned_malloc(4 * sizeof(float), 16);
+		*components = _mm_setr_ps(x, y, z, 0.0f);
 	}
 
+	//Working.
+	vec(__m128 vector) noexcept
+	{
+		components = (__m128*)_aligned_malloc(4 * sizeof(float), 16);
+		*components = vector;
+	}
+	
+	//Should Work.
+	~vec()
+	{
+		_aligned_free(components);
+	}
+
+	//Working.
 	vec operator+(const vec &other) const noexcept
 	{
-		return vec(x + other.x, y + other.y, z + other.z);
+		return vec(_mm_add_ps(*other.components, *components));
 	}
 
 	vec operator-(const vec &other) const noexcept
 	{
-		return vec(x - other.x, y - other.y, z - other.z);
+		return vec(_mm_sub_ps(*other.components, *components));
 	}
 
 	vec operator*(double scale) const noexcept
 	{
-		return vec(x * scale, y * scale, z * scale);
+		return vec(_mm_mul_ps(*components, _mm_set1_ps(scale)));
 	}
 
 	vec mult(const vec &other) const noexcept
 	{
-		return vec(x * other.x, y * other.y, z * other.z);
+		return vec(_mm_mul_ps(*other.components, *components));
 	}
 
 	vec normal() const noexcept
@@ -317,7 +333,7 @@ int main(int argc, char **argv)
 	};
 	// **************************************************************************************
 
-	ray camera(vec(50, 52, 295.6), vec(0, -0.042612, -1).normal());
+	ray camera(vec(50.0f, 52.0f, 295.6f), vec(0.0f, -0.042612f, -1.0f).normal());
 	vec cx = vec(0.5135);
 	vec cy = (cx.cross(camera.direction)).normal() * 0.5135;
 	vec r;
@@ -363,7 +379,7 @@ int main(int argc, char **argv)
 	auto total = end - start;
 
 	std::cout << "img.bmp" << (array2bmp("img.bmp", pixels, dimension, dimension) ? " Saved\n" : " Save Failed\n");
-	std::cout << "Time taken: " << duration_cast<seconds>(total).count() << endl;
+	//std::cout << "Time taken: " << duration_cast<seconds>(total).count() << endl;
 
 	return 0;
 }
