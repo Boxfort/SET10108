@@ -31,6 +31,7 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 	return clamp(v, lo, hi, std::less<>());
 }
 
+//Use __m128 instead of 3 doubles?
 struct vec
 {
 	double x, y, z;
@@ -301,7 +302,7 @@ int main(int argc, char **argv)
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
 	constexpr size_t dimension = 1024;
-	size_t samples = 1; // Algorithm performs 4 * samples per pixel.
+	size_t samples = 4; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
 		sphere(1e5, vec(1e5 + 1, 40.8, 81.6), vec(), vec(0.75, 0.25, 0.25), reflection_type::DIFFUSE),
@@ -327,7 +328,7 @@ int main(int argc, char **argv)
 	
 	const unsigned int ITERATIONS = 10;
 
-	for (samples; samples < 4; samples = samples + 1)
+	for (samples; samples < 5; samples = samples + 1)
 	{
 		data << "Samples: " << samples * 4 << ",";
 
