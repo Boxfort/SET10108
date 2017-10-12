@@ -11,15 +11,15 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <omp.h>
 #include <thread>
 #include <xmmintrin.h> 
-#define vec vec_simd
 
 using namespace std;
 using namespace std::chrono;
 
-constexpr size_t MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
-constexpr float PI = 3.14159265359;
+constexpr std::size_t MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
+constexpr double PI = 3.14159265359;
 
 template <class T, class Compare>
 constexpr const T &clamp(const T &v, const T &lo, const T &hi, Compare comp)
@@ -33,73 +33,12 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 	return clamp(v, lo, hi, std::less<>());
 }
 
-struct vec_double
-{
-	double x, y, z;
-
-	vec_double(double x = 0, double y = 0, double z = 0) noexcept
-		: x(x), y(y), z(z)
-	{
-	}
-
-	float get_x() const noexcept
-	{
-		return x;
-	}
-
-	float get_y() const noexcept
-	{
-		return y;
-	}
-
-	float get_z() const noexcept
-	{
-		return z;
-	}
-
-	vec_double operator+(const vec_double &other) const noexcept
-	{
-		return vec_double(x + other.x, y + other.y, z + other.z);
-	}
-
-	vec_double operator-(const vec_double &other) const noexcept
-	{
-		return vec_double(x - other.x, y - other.y, z - other.z);
-	}
-
-	vec_double operator*(double scale) const noexcept
-	{
-		return vec_double(x * scale, y * scale, z * scale);
-	}
-
-	vec_double mult(const vec_double &other) const noexcept
-	{
-		return vec_double(x * other.x, y * other.y, z * other.z);
-	}
-
-	vec_double normal() const noexcept
-	{
-		return *this * (1.0 / sqrt(x * x + y * y + z * z));
-	}
-
-	double dot(const vec_double &other) const noexcept
-	{
-		return x * other.x + y * other.y + z * other.z;
-	}
-
-	vec_double cross(const vec_double &other) const noexcept
-	{
-		return vec_double(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x);
-	}
-};
-
-//Use __m128 instead of 3 floats?
-struct vec_simd
+struct vec
 {
 	__m128 components;
 
 	//Working.
-	vec_simd(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
+	vec(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
 	{
 		//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
 		components = _mm_set_ps(0.0f, z, y, x);
@@ -112,7 +51,7 @@ struct vec_simd
 	}
 
 	//Working.
-	vec_simd(__m128 vector) noexcept
+	vec(__m128 vector) noexcept
 	{
 		//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
 		components = vector;
@@ -124,61 +63,61 @@ struct vec_simd
 	//	components = copy.components;
 	//}
 
-	float get_x() const noexcept
+	float get_x() noexcept
 	{
 		return components.m128_f32[0];
 	}
 
-	float get_y() const noexcept
+	float get_y() noexcept
 	{
 		return components.m128_f32[1];
 	}
 
-	float get_z() const noexcept
+	float get_z() noexcept
 	{
 		return components.m128_f32[2];
 	}
 
 	//Working.
-	vec_simd operator+(const vec_simd other) const noexcept
+	vec operator+(const vec other) const noexcept
 	{
-		return vec_simd(_mm_add_ps(other.components, components));
+		return vec(_mm_add_ps(other.components, components));
 	}
 
-	vec_simd operator-(const vec_simd other) const noexcept
+	vec operator-(const vec other) const noexcept
 	{
-		return vec_simd(_mm_sub_ps(other.components, components));
+		return vec(_mm_sub_ps(other.components, components));
 	}
 
-	vec_simd operator*(float scale) const noexcept
+	vec operator*(float scale) const noexcept
 	{
-		return vec_simd(_mm_mul_ps(components, _mm_set1_ps(scale)));
+		return vec(_mm_mul_ps(components, _mm_set1_ps(scale)));
 	}
 
-	vec_simd mult(const vec_simd &other) const noexcept
+	vec mult(const vec &other) const noexcept
 	{
-		return vec_simd(_mm_mul_ps(other.components, components));
+		return vec(_mm_mul_ps(other.components, components));
 	}
 
-	vec_simd normal() const noexcept
+	vec normal() const noexcept
 	{
 		// Square each component
 		__m128 result = _mm_mul_ps(components, components);
 		// Sum all components
 		result.m128_f32[0] = result.m128_f32[1] = result.m128_f32[2] = result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
 		// Find reciprocal squrare root and times by original vector
-		return vec_simd(_mm_mul_ps(_mm_rsqrt_ps(result), components));
+		return vec(_mm_mul_ps(_mm_rsqrt_ps(result), components));
 	}
 
-	float dot(const vec_simd &other) const noexcept
+	float dot(const vec &other) const noexcept
 	{
 		__m128 result = _mm_mul_ps(other.components, components);
 		return result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
 	}
 
-	vec_simd cross(const vec_simd &other) const noexcept
+	vec cross(const vec &other) const noexcept
 	{
-		return vec_simd(components.m128_f32[1] * other.components.m128_f32[2] - components.m128_f32[2] * other.components.m128_f32[1], components.m128_f32[2] * other.components.m128_f32[0] - components.m128_f32[0] * other.components.m128_f32[2], components.m128_f32[0] * other.components.m128_f32[1] - components.m128_f32[1] * other.components.m128_f32[0]);
+		return vec(components.m128_f32[1] * other.components.m128_f32[2] - components.m128_f32[2] * other.components.m128_f32[1], components.m128_f32[2] * other.components.m128_f32[0] - components.m128_f32[0] * other.components.m128_f32[2], components.m128_f32[0] * other.components.m128_f32[1] - components.m128_f32[1] * other.components.m128_f32[0]);
 		//return vec(_mm_sub_ps(
 		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 1, 0, 2))),
 		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 0, 2, 1)))
@@ -201,22 +140,22 @@ enum struct reflection_type { DIFFUSE, SPECULAR, REFRACTIVE };
 
 struct sphere
 {
-	float radius;
+	double radius;
 	vec position;
 	vec emission, colour;
 	reflection_type reflection;
 
-	sphere(float radius, const vec &position, const vec &emission, const vec &colour, reflection_type reflection) noexcept
+	sphere(double radius, vec position, vec emission, vec colour, reflection_type reflection) noexcept
 		: radius(radius), position(position), emission(emission), colour(colour), reflection(reflection)
 	{
 	}
 
-	float intersection(const ray &ray) const noexcept
+	double intersection(const ray &ray) const noexcept
 	{
-		static constexpr float eps = 1e-4;
+		static constexpr double eps = 1e-4;
 		vec origin_position = position - ray.origin;
-		float b = origin_position.dot(ray.direction);
-		float determinant = b * b - origin_position.dot(origin_position) + radius * radius;
+		double b = origin_position.dot(ray.direction);
+		double determinant = b * b - origin_position.dot(origin_position) + radius * radius;
 		if (determinant < 0)
 		{
 			return 0;
@@ -225,7 +164,7 @@ struct sphere
 		{
 			determinant = sqrt(determinant);
 		}
-		float t = b - determinant;
+		double t = b - determinant;
 		if (t > eps)
 		{
 			return t;
@@ -245,13 +184,13 @@ struct sphere
 	}
 };
 
-inline bool intersect(const vector<sphere> &spheres, const ray &ray, float &distance, size_t &sphere_index) noexcept
+inline bool intersect(const vector<sphere> &spheres, const ray &ray, double &distance, std::size_t &sphere_index) noexcept
 {
-	static constexpr float maximum_distance = 1e20;
+	static constexpr double maximum_distance = 1e20;
 	distance = maximum_distance;
-	for (size_t index = 0; index < spheres.size(); ++index)
+	for (std::size_t index = 0; index < spheres.size(); ++index)
 	{
-		float temp_distance = spheres[index].intersection(ray);
+		double temp_distance = spheres[index].intersection(ray);
 		if (temp_distance > 0 && temp_distance < distance)
 		{
 			distance = temp_distance;
@@ -265,27 +204,30 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 {
 	static random_device rd;
 	static default_random_engine generator(rd());
-	static uniform_real_distribution<float> distribution;
+	static uniform_real_distribution<double> distribution;
 	static auto get_random_number = bind(distribution, generator);
 
-	float distance;
-	size_t sphere_index;
+	double distance;
+	std::size_t sphere_index;
 	if (!intersect(spheres, the_ray, distance, sphere_index))
 		return vec();
 	const sphere &hit_sphere = spheres[sphere_index];
 	vec hit_point = the_ray.origin + the_ray.direction * distance;
 	vec intersection_normal = (hit_point - hit_sphere.position).normal();
-	vec pos_intersection_normal = intersection_normal.dot(the_ray.direction) < 0.0 ? intersection_normal : intersection_normal * -1.0;
+	vec pos_intersection_normal = intersection_normal.dot(the_ray.direction) < 0 ? intersection_normal : intersection_normal * -1;
 	vec colour = hit_sphere.colour;
-	float max_reflection = max({ colour.get_x() , colour.get_y() , colour.get_z() });
+	double max_reflection = max({ colour.get_x(), colour.get_y(), colour.get_z() });
+
+	if (sphere_index == 1)
+	{
+		cout << "" << endl;
+	}
+
 	if (depth > MAX_DEPTH)
 	{
-		if (hit_sphere.emission.get_x() != 0.0) {
-			auto g = distance;
-		}
 		return hit_sphere.emission;
 	}
-	else if (++depth > 5.0)
+	else if (++depth > 5)
 	{
 		if (get_random_number() < max_reflection)
 		{
@@ -293,52 +235,44 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 		}
 		else
 		{
-			if (hit_sphere.emission.get_x() != 0.0) {
-				auto g = distance;
-			}
 			return hit_sphere.emission;
 		}
 	}
 
 	if (hit_sphere.reflection == reflection_type::DIFFUSE)
 	{
-		float r1 = 2.0 * PI * get_random_number();
-		float r2 = get_random_number();
+		double r1 = 2.0 * PI * get_random_number();
+		double r2 = get_random_number();
 		vec w = pos_intersection_normal;
-		vec u = ((abs(w.get_x()) > 0.1 ? vec(0.0, 1.0, 0.0) : vec(1.0, 0.0, 0.0)).cross(w)).normal();
+		vec u = ((abs(w.get_x()) > 0.1 ? vec(0, 1, 0) : vec(1, 0, 0)).cross(w)).normal();
 		vec v = w.cross(u);
 		vec new_direction = (u * cos(r1) * sqrt(r2) + v * sin(r1) * sqrt(r2) + w * sqrt(1 - r2)).normal();
-
-		auto rr = radiance(spheres, ray(hit_point, new_direction), depth);
-		auto r = hit_sphere.emission + colour.mult(rr);
+		auto r = hit_sphere.emission + colour.mult(radiance(spheres, ray(hit_point, new_direction), depth));
 		return r;
 	}
 	else if (hit_sphere.reflection == reflection_type::SPECULAR)
 	{
-			//cout << sphere_index << " Emssion " << hit_sphere.emission.get_x() << " | " << hit_sphere.emission.get_y() << " | " << hit_sphere.emission.get_z() << endl;
-			//cout << sphere_index << " Colour  " << colour.components.m128_f32[0] << " | " << colour.components.m128_f32[1] << " | " << colour.components.m128_f32[2] << endl;
-
-		return hit_sphere.emission + colour.mult(radiance(spheres, ray(hit_point, the_ray.direction - intersection_normal * 2.0 * intersection_normal.dot(the_ray.direction)), depth));
+		return hit_sphere.emission + colour.mult(radiance(spheres, ray(hit_point, the_ray.direction - intersection_normal * 2 * intersection_normal.dot(the_ray.direction)), depth));
 	}
-	ray reflection_ray(hit_point, the_ray.direction - intersection_normal * 2.0 * intersection_normal.dot(the_ray.direction));
-	bool into = intersection_normal.dot(pos_intersection_normal) > 0.0;
-	float nc = 1.0, nt = 1.5, nnt = into ? nc / nt : nt / nc;
-	float ddn = the_ray.direction.dot(pos_intersection_normal);
-	float cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+	ray reflection_ray(hit_point, the_ray.direction - intersection_normal * 2 * intersection_normal.dot(the_ray.direction));
+	bool into = intersection_normal.dot(pos_intersection_normal) > 0;
+	double nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc;
+	double ddn = the_ray.direction.dot(pos_intersection_normal);
+	double cos2t = 1 - nnt * nnt * (1 - ddn * ddn);
 	if (cos2t < 0.0)
 	{
 		return hit_sphere.emission + colour.mult(radiance(spheres, reflection_ray, depth));
 	}
-	vec tdir = (the_ray.direction * nnt - intersection_normal * ((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)))).normal();
-	float a = nt - nc;
-	float b = nt + nc;
-	float R0 = a * a / (b * b);
-	float c = 1.0 - (into ? -ddn : tdir.dot(intersection_normal));
-	float Re = R0 + (1.0 - R0) * c * c * c * c * c;
-	float Tr = 1.0 - Re;
-	float P = 0.25 + 0.5 * Re;
-	float RP = Re / P;
-	float TP = Tr / (1.0 - P);
+	vec tdir = (the_ray.direction * nnt - intersection_normal * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).normal();
+	double a = nt - nc;
+	double b = nt + nc;
+	double R0 = a * a / (b * b);
+	double c = 1 - (into ? -ddn : tdir.dot(intersection_normal));
+	double Re = R0 + (1 - R0) * c * c * c * c * c;
+	double Tr = 1 - Re;
+	double P = 0.25 + 0.5 * Re;
+	double RP = Re / P;
+	double TP = Tr / (1.0 - P);
 	if (depth > 2)
 	{
 		if (get_random_number() < P)
@@ -375,7 +309,7 @@ inline std::ostream &operator<<(std::ostream &outs, const lwrite &v)
 	return outs;
 }
 
-bool array2bmp(const std::string &filename, const vector<vec> &pixels, const size_t width, const size_t height)
+bool array2bmp(const std::string &filename, const vector<vec> &pixels, const std::size_t width, const std::size_t height)
 {
 	std::ofstream f(filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 	if (!f)
@@ -383,9 +317,9 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const siz
 		return false;
 	}
 	// Write Bmp file headers
-	const size_t headers_size = 14 + 40;
-	const size_t padding_size = (4 - ((height * 3) % 4)) % 4;
-	const size_t pixel_data_size = width * ((height * 3) + padding_size);
+	const std::size_t headers_size = 14 + 40;
+	const std::size_t padding_size = (4 - ((height * 3) % 4)) % 4;
+	const std::size_t pixel_data_size = width * ((height * 3) + padding_size);
 	f.put('B').put('M'); // bfType
 						 // bfSize
 	f << lwrite(headers_size + pixel_data_size, 4);
@@ -400,12 +334,12 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const siz
 	// biXPelsPerMeter, biYPelsPerMeter, biClrUsed, biClrImportant
 	f << lwrite(0, 4) << lwrite(0, 4) << lwrite(0, 4) << lwrite(0, 4);
 	// Write image data
-	for (size_t x = height; x > 0; x--)
+	for (std::size_t x = height; x > 0; x--)
 	{
-		for (size_t y = 0; y < width; y++)
+		for (std::size_t y = 0; y < width; y++)
 		{
 			const auto &val = pixels[((x - 1) * width) + y];
-			f.put(static_cast<char>(int(255.0 * val.get_z()))).put(static_cast<char>(int(255.0 * val.get_y()))).put(static_cast<char>(255.0 * val.get_x()));
+			f.put(static_cast<char>(int(255.0f * val.components.m128_f32[2]))).put(static_cast<char>(int(255.0f * val.components.m128_f32[1]))).put(static_cast<char>(255.0f * val.components.m128_f32[0]));
 		}
 		if (padding_size)
 		{
@@ -417,25 +351,53 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const siz
 
 int main(int argc, char **argv)
 {
-	vec a = vec(0.25, 0.75, 0.3);
-	vec b = vec(0.52, 1.4, 0.12345);
-	vec o = vec(0, 0, 0);
+	/*
+	--- TESTING ---
+	*/
 
-	vec c = o + a.mult(b);
+	vec a = vec(1.0, 2.0, 1.0);
+	vec b = vec(2.0, 2.0, 1.0);
+
+	vec c = a.mult(b);
+
+	if (c.get_x() != 2.0f || c.get_y() != 4.0f || c.get_z() != 1.0f)
+		throw new exception;
+
+	float dot = a.dot(b);
+
+	if (dot != 7.0f)
+		throw new exception;
+
+	vec cross = a.cross(b);
+
+	if (cross.get_x() != 0 || cross.get_y() != 1.0f || cross.get_z() != -2.0f)
+		throw new exception;
+
+	float clampa = clamp(0.002f, 0.0f, 1.0f); //0.002
+	float clampb = clamp(-10.0f, 0.0f, 1.0f); //0.0
+	float clampc = clamp(12.2f, 0.0f, 1.0f); // 1.0
+
+	if (clampa != 0.002f || clampb != 0.0f || clampc != 1.0f)
+		throw new exception;
+
+	/*
+	-- END TESTING ---
+	*/
 
 
 	random_device rd;
 	default_random_engine generator(rd());
-	uniform_real_distribution<float> distribution;
+	uniform_real_distribution<double> distribution;
 	auto get_random_number = bind(distribution, generator);
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
-	constexpr size_t dimension = 256;
-	size_t samples = 1; // Algorithm performs 4 * samples per pixel.
+	constexpr std::size_t dimension = 1024;
+	constexpr std::size_t samples = 2; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
-		sphere(1e5, vec(1e5 + 1, 40.8, 81.6), vec(), vec(0.75, 0.25, 0.25), reflection_type::DIFFUSE),
-		sphere(1e5, vec(-1e5 + 99, 40.8, 81.6), vec(), vec(0.25, 0.25, 0.75), reflection_type::DIFFUSE),
+		// ******** !!!!!!!!! COLOR IS BEING SET TO 0,0,0 IN THE RADIANCE FUNCTION FIX IT !!!!!!!!!!!!************
+		sphere(1e5, vec(1e5f + 1.0f, 40.8f, 81.6f), vec(0.0f, 0.0f, 0.0f), vec(0.75f, 0.25f, 0.25f), reflection_type::DIFFUSE),
+		sphere(1e5, vec(-1e5f + 99.0f, 40.8f, 81.6f), vec(), vec(0.25f, 0.25f, 0.75f), reflection_type::DIFFUSE),
 		sphere(1e5, vec(50, 40.8, 1e5), vec(), vec(0.75, 0.75, 0.75), reflection_type::DIFFUSE),
 		sphere(1e5, vec(50, 40.8, -1e5 + 170), vec(), vec(), reflection_type::DIFFUSE),
 		sphere(1e5, vec(50, 1e5, 81.6), vec(), vec(0.75, 0.75, 0.75), reflection_type::DIFFUSE),
@@ -446,45 +408,53 @@ int main(int argc, char **argv)
 	};
 	// **************************************************************************************
 
-
-	ray camera(vec(50, 52, 295.6), vec(0, -0.042612, -1).normal());
-	vec cx = vec(0.5135);
+	ray camera(vec(50.0f, 52.0f, 295.6f), vec(0.0f, -0.042612f, -1.0f).normal());
+	vec cx = vec(0.5135f);
 	vec cy = (cx.cross(camera.direction)).normal() * 0.5135;
-	vec r;
+	vec r = vec();
 	vector<vec> pixels(dimension * dimension);
 
 	unsigned int NUM_THREADS = thread::hardware_concurrency();
 	auto start = system_clock::now();
+
+	cout << "hello" << endl;
 
 	//For each row of pixels.
 	//#pragma omp parallel for num_threads(NUM_THREADS) shared(pixels) private(r)
 	for (int y = 0; y < dimension; ++y)
 	{
 		std::cout << "Rendering " << dimension << " * " << dimension << "pixels. Samples:" << samples * 4 << " spp (" << 100.0 * y / (dimension - 1) << ")" << endl;
-
 		// For each pixel in row
-		int x;
-		for (x = 0; x < dimension; ++x)
+		for (int x = 0; x < dimension; ++x)
 		{
-
-			for (size_t sy = 0, i = (dimension - y - 1) * dimension + x; sy < 2; ++sy)
+			for (std::size_t sy = 0, i = (dimension - y - 1) * dimension + x; sy < 2; ++sy)
 			{
-				for (size_t sx = 0; sx < 2; ++sx)
+				for (std::size_t sx = 0; sx < 2; ++sx)
 				{
 					r = vec();
-					//Repeat for sample count.
 
-					for (size_t s = 0; s < samples; ++s)
+					//Repeat for sample count.
+					for (std::size_t s = 0; s < samples; ++s)
 					{
-						float r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-						float r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-						vec direction = cx * static_cast<float>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<float>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
-						r = r + radiance(spheres, ray(camera.origin + direction * 140.0, direction.normal()), 0.0) * (1.0 / (double)(samples));
-						auto p = direction.normal();
-						auto q = p;
+						double r1 = 2 * get_random_number();
+						double r2 = 2 * get_random_number();
+						double dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+						double dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+
+						vec direction = cx * static_cast<double>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<double>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
+
+						ray rayman = ray(camera.origin + direction * 140, direction.normal());
+						vec radiance1 = radiance(spheres, ray(camera.origin + direction * 140, direction.normal()), 0);
+						vec radiance2 = radiance1 * (1.0 / samples);
+
+						r = r + radiance(spheres, ray(camera.origin + direction * 140, direction.normal()), 0) * (1.0 / samples);
+
+						if (r.get_x() != 0.0f)
+							throw new exception;
 					}
 
 					pixels[i] = pixels[i] + vec(clamp(r.get_x(), 0.0f, 1.0f), clamp(r.get_y(), 0.0f, 1.0f), clamp(r.get_z(), 0.0f, 1.0f)) * 0.25f;
+
 				}
 			}
 		}
@@ -493,11 +463,8 @@ int main(int argc, char **argv)
 	auto end = system_clock::now();
 	auto total = end - start;
 
-
 	std::cout << "img.bmp" << (array2bmp("img.bmp", pixels, dimension, dimension) ? " Saved\n" : " Save Failed\n");
 	//std::cout << "Time taken: " << duration_cast<seconds>(total).count() << endl;
-	//int a;
-	//std::cin >> a;
 
 	return 0;
 }
