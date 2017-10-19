@@ -11,9 +11,9 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <xmmintrin.h> 
+#include "float4.h"
 
-#define vec vec_simdouble
+#define vec vec_simd
 
 using namespace std;
 using namespace std::chrono;
@@ -93,7 +93,8 @@ struct vec_double
 	}
 };
 
-//Use __m128 instead of 3 floats?
+/*
+
 struct vec_simd
 {
 	__m128 components;
@@ -101,28 +102,14 @@ struct vec_simd
 	//Working.
 	vec_simd(double x = 0.0f, double y = 0.0f, double z = 0.0f) noexcept
 	{
-		//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
 		components = _mm_set_ps(0.0f, z, y, x);
-		/*
-		components.m128_f32[0] = x;
-		components.m128_f32[1] = y;
-		components.m128_f32[2] = z;
-		components.m128_f32[3] = 0.0f;
-		*/
 	}
 
 	//Working.
 	vec_simd(__m128 vector) noexcept
 	{
-		//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
 		components = vector;
 	}
-
-	//vec(const vec& copy)
-	//{
-	//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
-	//	components = copy.components;
-	//}
 
 	double get_x() const noexcept
 	{
@@ -187,6 +174,9 @@ struct vec_simd
 
 };
 
+*/
+
+/*
 struct vec_simdouble
 {
 	__m256d components;
@@ -201,7 +191,7 @@ struct vec_simdouble
 		components.m128_f32[1] = y;
 		components.m128_f32[2] = z;
 		components.m128_f32[3] = 0.0f;
-		*/
+		
 
 	}
 
@@ -280,6 +270,8 @@ struct vec_simdouble
 	}
 
 };
+
+*/
 
 struct ray
 {
@@ -515,16 +507,13 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int
 
 int main(int argc, char **argv)
 {
-	vec_simdouble a = vec_simdouble(0.124, 0.8725, 0.25);
-	vec_simdouble b = vec_simdouble(-0.56, -0.38725, 0.25);
-
 	random_device rd;
 	default_random_engine generator(rd());
 	uniform_real_distribution<double> distribution;
 	auto get_random_number = bind(distribution, generator);
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
-	constexpr int dimension = 256;
+	constexpr int dimension = 512;
 	int samples = 1; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
@@ -577,7 +566,7 @@ int main(int argc, char **argv)
 						auto q = p;
 					}
 
-					pixels[i] = pixels[i] + vec(clamp(r.get_x(), 0.0, 1.0), clamp(r.get_y(), 0.0, 1.0), clamp(r.get_z(), 0.0, 1.0)) * 0.25f;
+					pixels[i] = pixels[i] + vec(clamp(r.get_x(), 0.0f, 1.0f), clamp(r.get_y(), 0.0f, 1.0f), clamp(r.get_z(), 0.0f, 1.0f)) * 0.25f;
 				}
 			}
 		}

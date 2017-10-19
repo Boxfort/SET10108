@@ -35,6 +35,7 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 }
 
 //Use __m128 instead of 3 doubles?
+/*
 struct vec
 {
 	double x, y, z;
@@ -79,6 +80,7 @@ struct vec
 		return vec(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x);
 	}
 };
+*/
 
 struct ray
 {
