@@ -41,15 +41,6 @@ inline static float4 float4_mul(float4 lhs, float4 rhs) {
 	return ret;
 }
 
-inline static float4 float4_div(float4 lhs, float4 rhs) {
-	float4 ret = _mm_div_ps(lhs, rhs);
-	return ret;
-}
-
-inline static float4 float4_madd(float4 m1, float4 m2, float4 a) {
-	return float4_add(float4_mul(m1, m2), a);
-}
-
 inline static float4 float4_mul_f(float4 lhs, float v)
 {
 	float4 f = float4_mul(lhs, float4_create(v, v, v, v));
@@ -196,10 +187,5 @@ public:
 	inline vec_simd operator*(float v) const
 	{
 		return vec_simd(float4_mul_f(components, v));
-	}
-
-	inline vec_simd operator/(const vec_simd& other) const
-	{
-		return vec_simd(float4_div(components, other.components));
 	}
 };

@@ -19,7 +19,7 @@ using namespace std;
 using namespace std::chrono;
 
 constexpr int MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
-constexpr double PI = 3.14159265359;
+constexpr float PI = 3.14159265359;
 
 template <class T, class Compare>
 constexpr const T &clamp(const T &v, const T &lo, const T &hi, Compare comp)
@@ -35,24 +35,24 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 
 struct vec_double
 {
-	double x, y, z;
+	float x, y, z;
 
-	vec_double(double x = 0, double y = 0, double z = 0) noexcept
+	vec_double(float x = 0, float y = 0, float z = 0) noexcept
 		: x(x), y(y), z(z)
 	{
 	}
 
-	double get_x() const noexcept
+	float get_x() const noexcept
 	{
 		return x;
 	}
 
-	double get_y() const noexcept
+	float get_y() const noexcept
 	{
 		return y;
 	}
 
-	double get_z() const noexcept
+	float get_z() const noexcept
 	{
 		return z;
 	}
@@ -67,7 +67,7 @@ struct vec_double
 		return vec_double(x - other.x, y - other.y, z - other.z);
 	}
 
-	vec_double operator*(double scale) const noexcept
+	vec_double operator*(float scale) const noexcept
 	{
 		return vec_double(x * scale, y * scale, z * scale);
 	}
@@ -82,7 +82,7 @@ struct vec_double
 		return *this * (1.0 / sqrt(x * x + y * y + z * z));
 	}
 
-	double dot(const vec_double &other) const noexcept
+	float dot(const vec_double &other) const noexcept
 	{
 		return x * other.x + y * other.y + z * other.z;
 	}
@@ -97,80 +97,80 @@ struct vec_double
 
 struct vec_simd
 {
-	__m128 components;
+__m128 components;
 
-	//Working.
-	vec_simd(double x = 0.0f, double y = 0.0f, double z = 0.0f) noexcept
-	{
-		components = _mm_set_ps(0.0f, z, y, x);
-	}
+//Working.
+vec_simd(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
+{
+components = _mm_set_ps(0.0f, z, y, x);
+}
 
-	//Working.
-	vec_simd(__m128 vector) noexcept
-	{
-		components = vector;
-	}
+//Working.
+vec_simd(__m128 vector) noexcept
+{
+components = vector;
+}
 
-	double get_x() const noexcept
-	{
-		return components.m128_f32[0];
-	}
+float get_x() const noexcept
+{
+return components.m128_f32[0];
+}
 
-	double get_y() const noexcept
-	{
-		return components.m128_f32[1];
-	}
+float get_y() const noexcept
+{
+return components.m128_f32[1];
+}
 
-	double get_z() const noexcept
-	{
-		return components.m128_f32[2];
-	}
+float get_z() const noexcept
+{
+return components.m128_f32[2];
+}
 
-	//Working.
-	vec_simd operator+(const vec_simd other) const noexcept
-	{
-		return vec_simd(_mm_add_ps(other.components, components));
-	}
+//Working.
+vec_simd operator+(const vec_simd other) const noexcept
+{
+return vec_simd(_mm_add_ps(other.components, components));
+}
 
-	vec_simd operator-(const vec_simd other) const noexcept
-	{
-		return vec_simd(_mm_sub_ps(other.components, components));
-	}
+vec_simd operator-(const vec_simd other) const noexcept
+{
+return vec_simd(_mm_sub_ps(other.components, components));
+}
 
-	vec_simd operator*(double scale) const noexcept
-	{
-		return vec_simd(_mm_mul_ps(components, _mm_set1_ps(scale)));
-	}
+vec_simd operator*(float scale) const noexcept
+{
+return vec_simd(_mm_mul_ps(components, _mm_set1_ps(scale)));
+}
 
-	vec_simd mult(const vec_simd &other) const noexcept
-	{
-		return vec_simd(_mm_mul_ps(other.components, components));
-	}
+vec_simd mult(const vec_simd &other) const noexcept
+{
+return vec_simd(_mm_mul_ps(other.components, components));
+}
 
-	vec_simd normal() const noexcept
-	{
-		// Square each component
-		__m128 result = _mm_mul_ps(components, components);
-		// Sum all components
-		result.m128_f32[0] = result.m128_f32[1] = result.m128_f32[2] = result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
-		// Find reciprocal squrare root and times by original vector
-		return vec_simd(_mm_mul_ps(_mm_rsqrt_ps(result), components));
-	}
+vec_simd normal() const noexcept
+{
+// Square each component
+__m128 result = _mm_mul_ps(components, components);
+// Sum all components
+result.m128_f32[0] = result.m128_f32[1] = result.m128_f32[2] = result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
+// Find reciprocal squrare root and times by original vector
+return vec_simd(_mm_mul_ps(_mm_rsqrt_ps(result), components));
+}
 
-	double dot(const vec_simd &other) const noexcept
-	{
-		__m128 result = _mm_mul_ps(other.components, components);
-		return result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
-	}
+float dot(const vec_simd &other) const noexcept
+{
+__m128 result = _mm_mul_ps(other.components, components);
+return result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
+}
 
-	vec_simd cross(const vec_simd &other) const noexcept
-	{
-		return vec_simd(components.m128_f32[1] * other.components.m128_f32[2] - components.m128_f32[2] * other.components.m128_f32[1], components.m128_f32[2] * other.components.m128_f32[0] - components.m128_f32[0] * other.components.m128_f32[2], components.m128_f32[0] * other.components.m128_f32[1] - components.m128_f32[1] * other.components.m128_f32[0]);
-		//return vec(_mm_sub_ps(
-		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 1, 0, 2))),
-		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 0, 2, 1)))
-		//));
-	}
+vec_simd cross(const vec_simd &other) const noexcept
+{
+return vec_simd(components.m128_f32[1] * other.components.m128_f32[2] - components.m128_f32[2] * other.components.m128_f32[1], components.m128_f32[2] * other.components.m128_f32[0] - components.m128_f32[0] * other.components.m128_f32[2], components.m128_f32[0] * other.components.m128_f32[1] - components.m128_f32[1] * other.components.m128_f32[0]);
+//return vec(_mm_sub_ps(
+//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 1, 0, 2))),
+//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 0, 2, 1)))
+//));
+}
 
 };
 
@@ -179,95 +179,95 @@ struct vec_simd
 /*
 struct vec_simdouble
 {
-	__m256d components;
+__m256d components;
 
-	//Working.
-	vec_simdouble(double x = 0.0f, double y = 0.0f, double z = 0.0f) noexcept
-	{
-		//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
-		components = _mm256_set_pd(0.0f, z, y, x);
-		/*
-		components.m128_f32[0] = x;
-		components.m128_f32[1] = y;
-		components.m128_f32[2] = z;
-		components.m128_f32[3] = 0.0f;
-		
+//Working.
+vec_simdouble(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
+{
+//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+components = _mm256_set_pd(0.0f, z, y, x);
+/*
+components.m128_f32[0] = x;
+components.m128_f32[1] = y;
+components.m128_f32[2] = z;
+components.m128_f32[3] = 0.0f;
 
-	}
 
-	//Working.
-	vec_simdouble(__m256d vector) noexcept
-	{
-		//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
-		components = vector;
-	}
+}
 
-	vec_simdouble(const vec_simdouble& copy)
-	{
-	    //components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
-		components = copy.components;
-	}
+//Working.
+vec_simdouble(__m256d vector) noexcept
+{
+//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+components = vector;
+}
 
-	double get_x() const noexcept
-	{
-		return components.m256d_f64[0];
-	}
+vec_simdouble(const vec_simdouble& copy)
+{
+//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+components = copy.components;
+}
 
-	double get_y() const noexcept
-	{
-		return components.m256d_f64[1];
-	}
+float get_x() const noexcept
+{
+return components.m256d_f64[0];
+}
 
-	double get_z() const noexcept
-	{
-		return components.m256d_f64[2];
-	}
+float get_y() const noexcept
+{
+return components.m256d_f64[1];
+}
 
-	//Working.
-	vec_simdouble operator+(const vec_simdouble other) const noexcept
-	{
-		return vec_simdouble(_mm256_add_pd(other.components, components));
-	}
+float get_z() const noexcept
+{
+return components.m256d_f64[2];
+}
 
-	vec_simdouble operator-(const vec_simdouble other) const noexcept
-	{
-		return vec_simdouble(_mm256_sub_pd(other.components, components));
-	}
+//Working.
+vec_simdouble operator+(const vec_simdouble other) const noexcept
+{
+return vec_simdouble(_mm256_add_pd(other.components, components));
+}
 
-	vec_simdouble operator*(double scale) const noexcept
-	{
-		return vec_simdouble(_mm256_mul_pd(components, _mm256_set1_pd(scale)));
-	}
+vec_simdouble operator-(const vec_simdouble other) const noexcept
+{
+return vec_simdouble(_mm256_sub_pd(other.components, components));
+}
 
-	vec_simdouble mult(const vec_simdouble &other) const noexcept
-	{
-		return vec_simdouble(_mm256_mul_pd(other.components, components));
-	}
+vec_simdouble operator*(float scale) const noexcept
+{
+return vec_simdouble(_mm256_mul_pd(components, _mm256_set1_pd(scale)));
+}
 
-	vec_simdouble normal() const noexcept
-	{
-		// Square each component
-		__m256d result = _mm256_mul_pd(components, components);
-		// Sum all components
-		result.m256d_f64[0] = result.m256d_f64[1] = result.m256d_f64[2] = result.m256d_f64[0] + result.m256d_f64[1] + result.m256d_f64[2];
-		// Find reciprocal squrare root and times by original vector
-		return vec_simdouble(_mm256_mul_pd(_mm256_div_pd(_mm256_set1_pd(1.0f), _mm256_sqrt_pd(result)), components));
-	}
+vec_simdouble mult(const vec_simdouble &other) const noexcept
+{
+return vec_simdouble(_mm256_mul_pd(other.components, components));
+}
 
-	double dot(const vec_simdouble &other) const noexcept
-	{
-		__m256d result = _mm256_mul_pd(other.components, components);
-		return (result.m256d_f64[0] + result.m256d_f64[1] + result.m256d_f64[2]);
-	}
+vec_simdouble normal() const noexcept
+{
+// Square each component
+__m256d result = _mm256_mul_pd(components, components);
+// Sum all components
+result.m256d_f64[0] = result.m256d_f64[1] = result.m256d_f64[2] = result.m256d_f64[0] + result.m256d_f64[1] + result.m256d_f64[2];
+// Find reciprocal squrare root and times by original vector
+return vec_simdouble(_mm256_mul_pd(_mm256_div_pd(_mm256_set1_pd(1.0f), _mm256_sqrt_pd(result)), components));
+}
 
-	vec_simdouble cross(const vec_simdouble &other) const noexcept
-	{
-		return vec_simdouble(components.m256d_f64[1] * other.components.m256d_f64[2] - components.m256d_f64[2] * other.components.m256d_f64[1], components.m256d_f64[2] * other.components.m256d_f64[0] - components.m256d_f64[0] * other.components.m256d_f64[2], components.m256d_f64[0] * other.components.m256d_f64[1] - components.m256d_f64[1] * other.components.m256d_f64[0]);
-		//return vec(_mm_sub_ps(
-		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 1, 0, 2))),
-		//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 0, 2, 1)))
-		//));
-	}
+float dot(const vec_simdouble &other) const noexcept
+{
+__m256d result = _mm256_mul_pd(other.components, components);
+return (result.m256d_f64[0] + result.m256d_f64[1] + result.m256d_f64[2]);
+}
+
+vec_simdouble cross(const vec_simdouble &other) const noexcept
+{
+return vec_simdouble(components.m256d_f64[1] * other.components.m256d_f64[2] - components.m256d_f64[2] * other.components.m256d_f64[1], components.m256d_f64[2] * other.components.m256d_f64[0] - components.m256d_f64[0] * other.components.m256d_f64[2], components.m256d_f64[0] * other.components.m256d_f64[1] - components.m256d_f64[1] * other.components.m256d_f64[0]);
+//return vec(_mm_sub_ps(
+//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 1, 0, 2))),
+//	_mm_mul_ps(_mm_shuffle_ps(*other.components, *other.components, _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(*components, *components, _MM_SHUFFLE(3, 0, 2, 1)))
+//));
+}
 
 };
 
@@ -287,22 +287,22 @@ enum struct reflection_type { DIFFUSE, SPECULAR, REFRACTIVE };
 
 struct sphere
 {
-	double radius;
+	float radius;
 	vec position;
 	vec emission, colour;
 	reflection_type reflection;
 
-	sphere(double radius, const vec &position, const vec &emission, const vec &colour, reflection_type reflection) noexcept
+	sphere(float radius, const vec &position, const vec &emission, const vec &colour, reflection_type reflection) noexcept
 		: radius(radius), position(position), emission(emission), colour(colour), reflection(reflection)
 	{
 	}
 
-	double intersection(const ray &ray) const noexcept
+	float intersection(const ray &ray) const noexcept
 	{
-		static constexpr double eps = 1e-4;
+		static constexpr float eps = 1e-4;
 		vec origin_position = position - ray.origin;
-		double b = origin_position.dot(ray.direction);
-		double determinant = b * b - origin_position.dot(origin_position) + radius * radius;
+		float b = origin_position.dot(ray.direction);
+		float determinant = b * b - origin_position.dot(origin_position) + radius * radius;
 		if (determinant < 0)
 		{
 			return 0;
@@ -311,7 +311,7 @@ struct sphere
 		{
 			determinant = sqrt(determinant);
 		}
-		double t = b - determinant;
+		float t = b - determinant;
 		if (t > eps)
 		{
 			return t;
@@ -331,13 +331,13 @@ struct sphere
 	}
 };
 
-inline bool intersect(const vector<sphere> &spheres, const ray &ray, double &distance, int &sphere_index) noexcept
+inline bool intersect(const vector<sphere> &spheres, const ray &ray, float &distance, int &sphere_index) noexcept
 {
-	static constexpr double maximum_distance = 1e20;
+	static constexpr float maximum_distance = 1e20;
 	distance = maximum_distance;
 	for (int index = 0; index < spheres.size(); ++index)
 	{
-		double temp_distance = spheres[index].intersection(ray);
+		float temp_distance = spheres[index].intersection(ray);
 		if (temp_distance > 0 && temp_distance < distance)
 		{
 			distance = temp_distance;
@@ -351,10 +351,10 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 {
 	static random_device rd;
 	static default_random_engine generator(rd());
-	static uniform_real_distribution<double> distribution;
+	static uniform_real_distribution<float> distribution;
 	static auto get_random_number = bind(distribution, generator);
 
-	double distance;
+	float distance;
 	int sphere_index;
 	if (!intersect(spheres, the_ray, distance, sphere_index))
 		return vec();
@@ -363,7 +363,7 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 	vec intersection_normal = (hit_point - hit_sphere.position).normal();
 	vec pos_intersection_normal = intersection_normal.dot(the_ray.direction) < 0.0 ? intersection_normal : intersection_normal * -1.0;
 	vec colour = hit_sphere.colour;
-	double max_reflection = max({ colour.get_x() , colour.get_y() , colour.get_z() });
+	float max_reflection = max({ colour.get_x() , colour.get_y() , colour.get_z() });
 	if (depth > MAX_DEPTH)
 	{
 		if (hit_sphere.emission.get_x() != 0.0) {
@@ -388,13 +388,13 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 
 	if (hit_sphere.reflection == reflection_type::DIFFUSE)
 	{
-		double r1 = 2.0 * PI * get_random_number();
-		double r2 = get_random_number();
+		float r1 = 2.0 * PI * get_random_number();
+		float r2 = get_random_number();
 		vec w = pos_intersection_normal;
 		vec u = ((abs(w.get_x()) > 0.1 ? vec(0.0, 1.0, 0.0) : vec(1.0, 0.0, 0.0)).cross(w)).normal();
 		vec v = w.cross(u);
 		vec new_direction = (u * cos(r1) * sqrt(r2) + v * sin(r1) * sqrt(r2) + w * sqrt(1 - r2)).normal();
-		
+
 		if (depth > 1)
 			cout << "";
 
@@ -412,23 +412,23 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 	}
 	ray reflection_ray(hit_point, the_ray.direction - intersection_normal * 2.0 * intersection_normal.dot(the_ray.direction));
 	bool into = intersection_normal.dot(pos_intersection_normal) > 0.0;
-	double nc = 1.0, nt = 1.5, nnt = into ? nc / nt : nt / nc;
-	double ddn = the_ray.direction.dot(pos_intersection_normal);
-	double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+	float nc = 1.0, nt = 1.5, nnt = into ? nc / nt : nt / nc;
+	float ddn = the_ray.direction.dot(pos_intersection_normal);
+	float cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
 	if (cos2t < 0.0)
 	{
 		return hit_sphere.emission + colour.mult(radiance(spheres, reflection_ray, depth));
 	}
 	vec tdir = (the_ray.direction * nnt - intersection_normal * ((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)))).normal();
-	double a = nt - nc;
-	double b = nt + nc;
-	double R0 = a * a / (b * b);
-	double c = 1.0 - (into ? -ddn : tdir.dot(intersection_normal));
-	double Re = R0 + (1.0 - R0) * c * c * c * c * c;
-	double Tr = 1.0 - Re;
-	double P = 0.25 + 0.5 * Re;
-	double RP = Re / P;
-	double TP = Tr / (1.0 - P);
+	float a = nt - nc;
+	float b = nt + nc;
+	float R0 = a * a / (b * b);
+	float c = 1.0 - (into ? -ddn : tdir.dot(intersection_normal));
+	float Re = R0 + (1.0 - R0) * c * c * c * c * c;
+	float Tr = 1.0 - Re;
+	float P = 0.25 + 0.5 * Re;
+	float RP = Re / P;
+	float TP = Tr / (1.0 - P);
 	if (depth > 2)
 	{
 		if (get_random_number() < P)
@@ -507,14 +507,24 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int
 
 int main(int argc, char **argv)
 {
+	vec a = vec(0.23, 0.58, -0.87);
+	vec b = vec(-0.44, 0.1, 0.33);
+
+	vec c = a.cross(b);
+
+	vec_double aa = vec_double(0.23, 0.58, -0.87);
+	vec_double bb = vec_double(-0.44, 0.1, 0.33);
+
+	vec_double cc = aa.cross(bb);
+
 	random_device rd;
 	default_random_engine generator(rd());
-	uniform_real_distribution<double> distribution;
+	uniform_real_distribution<float> distribution;
 	auto get_random_number = bind(distribution, generator);
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
 	constexpr int dimension = 512;
-	int samples = 1; // Algorithm performs 4 * samples per pixel.
+	int samples = 12; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
 		sphere(1e5, vec(1e5 + 1, 40.8, 81.6), vec(), vec(0.75, 0.25, 0.25), reflection_type::DIFFUSE),
@@ -558,10 +568,10 @@ int main(int argc, char **argv)
 
 					for (int s = 0; s < samples; ++s)
 					{
-						double r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-						double r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-						vec direction = cx * static_cast<double>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<double>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
-						r = r + radiance(spheres, ray(camera.origin + direction * 140.0, direction.normal()), 0.0) * (1.0 / (double)(samples));
+						float r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+						float r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+						vec direction = cx * static_cast<float>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<float>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
+						r = r + radiance(spheres, ray(camera.origin + direction * 140.0, direction.normal()), 0.0) * (1.0 / (float)(samples));
 						auto p = direction.normal();
 						auto q = p;
 					}
