@@ -12,14 +12,15 @@
 #include <string>
 #include <thread>
 #include "float4.h"
+#include "double4.h"
 
-#define vec vec_simd
+#define vec vec_simdouble
 
 using namespace std;
 using namespace std::chrono;
 
-constexpr int MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
-constexpr float PI = 3.14159265359;
+constexpr int MAX_DEPTH = 256; // Upper limit on recursion, increase this on systems with more stack size.
+constexpr double PI = 3.14159265359;
 
 template <class T, class Compare>
 constexpr const T &clamp(const T &v, const T &lo, const T &hi, Compare comp)
@@ -35,24 +36,24 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 
 struct vec_double
 {
-	float x, y, z;
+	double x, y, z;
 
-	vec_double(float x = 0, float y = 0, float z = 0) noexcept
+	vec_double(double x = 0, double y = 0, double z = 0) noexcept
 		: x(x), y(y), z(z)
 	{
 	}
 
-	float get_x() const noexcept
+	double get_x() const noexcept
 	{
 		return x;
 	}
 
-	float get_y() const noexcept
+	double get_y() const noexcept
 	{
 		return y;
 	}
 
-	float get_z() const noexcept
+	double get_z() const noexcept
 	{
 		return z;
 	}
@@ -67,7 +68,7 @@ struct vec_double
 		return vec_double(x - other.x, y - other.y, z - other.z);
 	}
 
-	vec_double operator*(float scale) const noexcept
+	vec_double operator*(double scale) const noexcept
 	{
 		return vec_double(x * scale, y * scale, z * scale);
 	}
@@ -82,7 +83,7 @@ struct vec_double
 		return *this * (1.0 / sqrt(x * x + y * y + z * z));
 	}
 
-	float dot(const vec_double &other) const noexcept
+	double dot(const vec_double &other) const noexcept
 	{
 		return x * other.x + y * other.y + z * other.z;
 	}
@@ -100,7 +101,7 @@ struct vec_simd
 __m128 components;
 
 //Working.
-vec_simd(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
+vec_simd(double x = 0.0f, double y = 0.0f, double z = 0.0f) noexcept
 {
 components = _mm_set_ps(0.0f, z, y, x);
 }
@@ -111,17 +112,17 @@ vec_simd(__m128 vector) noexcept
 components = vector;
 }
 
-float get_x() const noexcept
+double get_x() const noexcept
 {
 return components.m128_f32[0];
 }
 
-float get_y() const noexcept
+double get_y() const noexcept
 {
 return components.m128_f32[1];
 }
 
-float get_z() const noexcept
+double get_z() const noexcept
 {
 return components.m128_f32[2];
 }
@@ -137,7 +138,7 @@ vec_simd operator-(const vec_simd other) const noexcept
 return vec_simd(_mm_sub_ps(other.components, components));
 }
 
-vec_simd operator*(float scale) const noexcept
+vec_simd operator*(double scale) const noexcept
 {
 return vec_simd(_mm_mul_ps(components, _mm_set1_ps(scale)));
 }
@@ -157,7 +158,7 @@ result.m128_f32[0] = result.m128_f32[1] = result.m128_f32[2] = result.m128_f32[0
 return vec_simd(_mm_mul_ps(_mm_rsqrt_ps(result), components));
 }
 
-float dot(const vec_simd &other) const noexcept
+double dot(const vec_simd &other) const noexcept
 {
 __m128 result = _mm_mul_ps(other.components, components);
 return result.m128_f32[0] + result.m128_f32[1] + result.m128_f32[2];
@@ -182,9 +183,9 @@ struct vec_simdouble
 __m256d components;
 
 //Working.
-vec_simdouble(float x = 0.0f, float y = 0.0f, float z = 0.0f) noexcept
+vec_simdouble(double x = 0.0f, double y = 0.0f, double z = 0.0f) noexcept
 {
-//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
 components = _mm256_set_pd(0.0f, z, y, x);
 /*
 components.m128_f32[0] = x;
@@ -198,27 +199,27 @@ components.m128_f32[3] = 0.0f;
 //Working.
 vec_simdouble(__m256d vector) noexcept
 {
-//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
 components = vector;
 }
 
 vec_simdouble(const vec_simdouble& copy)
 {
-//components = *(__m128*)_aligned_malloc(sizeof(float) * 4, 16);
+//components = *(__m128*)_aligned_malloc(sizeof(double) * 4, 16);
 components = copy.components;
 }
 
-float get_x() const noexcept
+double get_x() const noexcept
 {
 return components.m256d_f64[0];
 }
 
-float get_y() const noexcept
+double get_y() const noexcept
 {
 return components.m256d_f64[1];
 }
 
-float get_z() const noexcept
+double get_z() const noexcept
 {
 return components.m256d_f64[2];
 }
@@ -234,7 +235,7 @@ vec_simdouble operator-(const vec_simdouble other) const noexcept
 return vec_simdouble(_mm256_sub_pd(other.components, components));
 }
 
-vec_simdouble operator*(float scale) const noexcept
+vec_simdouble operator*(double scale) const noexcept
 {
 return vec_simdouble(_mm256_mul_pd(components, _mm256_set1_pd(scale)));
 }
@@ -254,7 +255,7 @@ result.m256d_f64[0] = result.m256d_f64[1] = result.m256d_f64[2] = result.m256d_f
 return vec_simdouble(_mm256_mul_pd(_mm256_div_pd(_mm256_set1_pd(1.0f), _mm256_sqrt_pd(result)), components));
 }
 
-float dot(const vec_simdouble &other) const noexcept
+double dot(const vec_simdouble &other) const noexcept
 {
 __m256d result = _mm256_mul_pd(other.components, components);
 return (result.m256d_f64[0] + result.m256d_f64[1] + result.m256d_f64[2]);
@@ -287,22 +288,22 @@ enum struct reflection_type { DIFFUSE, SPECULAR, REFRACTIVE };
 
 struct sphere
 {
-	float radius;
+	double radius;
 	vec position;
 	vec emission, colour;
 	reflection_type reflection;
 
-	sphere(float radius, const vec &position, const vec &emission, const vec &colour, reflection_type reflection) noexcept
+	sphere(double radius, const vec &position, const vec &emission, const vec &colour, reflection_type reflection) noexcept
 		: radius(radius), position(position), emission(emission), colour(colour), reflection(reflection)
 	{
 	}
 
-	float intersection(const ray &ray) const noexcept
+	double intersection(const ray &ray) const noexcept
 	{
-		static constexpr float eps = 1e-4;
+		static constexpr double eps = 1e-4;
 		vec origin_position = position - ray.origin;
-		float b = origin_position.dot(ray.direction);
-		float determinant = b * b - origin_position.dot(origin_position) + radius * radius;
+		double b = origin_position.dot(ray.direction);
+		double determinant = b * b - origin_position.dot(origin_position) + radius * radius;
 		if (determinant < 0)
 		{
 			return 0;
@@ -311,7 +312,7 @@ struct sphere
 		{
 			determinant = sqrt(determinant);
 		}
-		float t = b - determinant;
+		double t = b - determinant;
 		if (t > eps)
 		{
 			return t;
@@ -331,13 +332,13 @@ struct sphere
 	}
 };
 
-inline bool intersect(const vector<sphere> &spheres, const ray &ray, float &distance, int &sphere_index) noexcept
+inline bool intersect(const vector<sphere> &spheres, const ray &ray, double &distance, int &sphere_index) noexcept
 {
-	static constexpr float maximum_distance = 1e20;
+	static constexpr double maximum_distance = 1e20;
 	distance = maximum_distance;
 	for (int index = 0; index < spheres.size(); ++index)
 	{
-		float temp_distance = spheres[index].intersection(ray);
+		double temp_distance = spheres[index].intersection(ray);
 		if (temp_distance > 0 && temp_distance < distance)
 		{
 			distance = temp_distance;
@@ -351,10 +352,10 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 {
 	static random_device rd;
 	static default_random_engine generator(rd());
-	static uniform_real_distribution<float> distribution;
+	static uniform_real_distribution<double> distribution;
 	static auto get_random_number = bind(distribution, generator);
 
-	float distance;
+	double distance;
 	int sphere_index;
 	if (!intersect(spheres, the_ray, distance, sphere_index))
 		return vec();
@@ -363,7 +364,7 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 	vec intersection_normal = (hit_point - hit_sphere.position).normal();
 	vec pos_intersection_normal = intersection_normal.dot(the_ray.direction) < 0.0 ? intersection_normal : intersection_normal * -1.0;
 	vec colour = hit_sphere.colour;
-	float max_reflection = max({ colour.get_x() , colour.get_y() , colour.get_z() });
+	double max_reflection = max({ colour.get_x() , colour.get_y() , colour.get_z() });
 	if (depth > MAX_DEPTH)
 	{
 		if (hit_sphere.emission.get_x() != 0.0) {
@@ -388,8 +389,8 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 
 	if (hit_sphere.reflection == reflection_type::DIFFUSE)
 	{
-		float r1 = 2.0 * PI * get_random_number();
-		float r2 = get_random_number();
+		double r1 = 2.0 * PI * get_random_number();
+		double r2 = get_random_number();
 		vec w = pos_intersection_normal;
 		vec u = ((abs(w.get_x()) > 0.1 ? vec(0.0, 1.0, 0.0) : vec(1.0, 0.0, 0.0)).cross(w)).normal();
 		vec v = w.cross(u);
@@ -412,23 +413,23 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 	}
 	ray reflection_ray(hit_point, the_ray.direction - intersection_normal * 2.0 * intersection_normal.dot(the_ray.direction));
 	bool into = intersection_normal.dot(pos_intersection_normal) > 0.0;
-	float nc = 1.0, nt = 1.5, nnt = into ? nc / nt : nt / nc;
-	float ddn = the_ray.direction.dot(pos_intersection_normal);
-	float cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+	double nc = 1.0, nt = 1.5, nnt = into ? nc / nt : nt / nc;
+	double ddn = the_ray.direction.dot(pos_intersection_normal);
+	double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
 	if (cos2t < 0.0)
 	{
 		return hit_sphere.emission + colour.mult(radiance(spheres, reflection_ray, depth));
 	}
 	vec tdir = (the_ray.direction * nnt - intersection_normal * ((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)))).normal();
-	float a = nt - nc;
-	float b = nt + nc;
-	float R0 = a * a / (b * b);
-	float c = 1.0 - (into ? -ddn : tdir.dot(intersection_normal));
-	float Re = R0 + (1.0 - R0) * c * c * c * c * c;
-	float Tr = 1.0 - Re;
-	float P = 0.25 + 0.5 * Re;
-	float RP = Re / P;
-	float TP = Tr / (1.0 - P);
+	double a = nt - nc;
+	double b = nt + nc;
+	double R0 = a * a / (b * b);
+	double c = 1.0 - (into ? -ddn : tdir.dot(intersection_normal));
+	double Re = R0 + (1.0 - R0) * c * c * c * c * c;
+	double Tr = 1.0 - Re;
+	double P = 0.25 + 0.5 * Re;
+	double RP = Re / P;
+	double TP = Tr / (1.0 - P);
 	if (depth > 2)
 	{
 		if (get_random_number() < P)
@@ -507,24 +508,25 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int
 
 int main(int argc, char **argv)
 {
-	vec a = vec(0.23, 0.58, -0.87);
-	vec b = vec(-0.44, 0.1, 0.33);
+	vec_simd a = vec_simd(0, -0.042612, -1);
+	vec_simdouble b = vec_simdouble (0, -0.042612, -1);
 
-	vec c = a.cross(b);
+	float aa = a.dot(a);
+	float bb = b.dot(b);
 
-	vec_double aa = vec_double(0.23, 0.58, -0.87);
-	vec_double bb = vec_double(-0.44, 0.1, 0.33);
+	a = a.normal();
+	b = b.normal();
 
-	vec_double cc = aa.cross(bb);
+
 
 	random_device rd;
 	default_random_engine generator(rd());
-	uniform_real_distribution<float> distribution;
+	uniform_real_distribution<double> distribution;
 	auto get_random_number = bind(distribution, generator);
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
 	constexpr int dimension = 512;
-	int samples = 12; // Algorithm performs 4 * samples per pixel.
+	int samples = 1; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
 		sphere(1e5, vec(1e5 + 1, 40.8, 81.6), vec(), vec(0.75, 0.25, 0.25), reflection_type::DIFFUSE),
@@ -568,15 +570,15 @@ int main(int argc, char **argv)
 
 					for (int s = 0; s < samples; ++s)
 					{
-						float r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-						float r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-						vec direction = cx * static_cast<float>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<float>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
-						r = r + radiance(spheres, ray(camera.origin + direction * 140.0, direction.normal()), 0.0) * (1.0 / (float)(samples));
+						double r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+						double r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+						vec direction = cx * static_cast<double>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<double>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
+						r = r + radiance(spheres, ray(camera.origin + direction * 140.0, direction.normal()), 0.0) * (1.0 / (double)(samples));
 						auto p = direction.normal();
 						auto q = p;
 					}
 
-					pixels[i] = pixels[i] + vec(clamp(r.get_x(), 0.0f, 1.0f), clamp(r.get_y(), 0.0f, 1.0f), clamp(r.get_z(), 0.0f, 1.0f)) * 0.25f;
+					pixels[i] = pixels[i] + vec(clamp(r.get_x(), 0.0, 1.0), clamp(r.get_y(), 0.0, 1.0), clamp(r.get_z(), 0.0, 1.0)) * 0.25;
 				}
 			}
 		}
