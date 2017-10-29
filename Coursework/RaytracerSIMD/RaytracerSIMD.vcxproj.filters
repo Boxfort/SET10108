@@ -24,7 +24,7 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Raytracer\double4.h">
+    <ClInclude Include="double4.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -32,7 +32,7 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RayTracerUnchanged.cpp">
+    <ClCompile Include="RaytracerSIMD.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,3 +1,5 @@
+// RaytracerOMP.cpp : Defines the entry point for the console application.
+//
 #include "stdafx.h"
 
 #include <algorithm>
@@ -12,13 +14,12 @@
 #include <iostream>
 #include <string>
 #include <thread>
-
-#define vec vec_simdouble
+#include <omp.h>
 
 using namespace std;
 using namespace std::chrono;
 
-constexpr int MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
+constexpr size_t MAX_DEPTH = 256; // Upper limit on recursion, increase this on systems with more stack size.
 constexpr double PI = 3.14159265359;
 
 template <class T, class Compare>
@@ -33,8 +34,6 @@ constexpr const T &clamp(const T &v, const T &lo, const T &hi)
 	return clamp(v, lo, hi, std::less<>());
 }
 
-/*
-//Use __m128 instead of 3 doubles?
 struct vec
 {
 	double x, y, z;
@@ -79,8 +78,6 @@ struct vec
 		return vec(y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x);
 	}
 };
-
-*/
 
 struct ray
 {
@@ -140,11 +137,11 @@ struct sphere
 	}
 };
 
-inline bool intersect(const vector<sphere> &spheres, const ray &ray, double &distance, int &sphere_index) noexcept
+inline bool intersect(const vector<sphere> &spheres, const ray &ray, double &distance, size_t &sphere_index) noexcept
 {
 	static constexpr double maximum_distance = 1e20;
 	distance = maximum_distance;
-	for (int index = 0; index < spheres.size(); ++index)
+	for (size_t index = 0; index < spheres.size(); ++index)
 	{
 		double temp_distance = spheres[index].intersection(ray);
 		if (temp_distance > 0 && temp_distance < distance)
@@ -164,7 +161,7 @@ vec radiance(const vector<sphere> &spheres, const ray &the_ray, int depth) noexc
 	static auto get_random_number = bind(distribution, generator);
 
 	double distance;
-	int sphere_index;
+	size_t sphere_index;
 	if (!intersect(spheres, the_ray, distance, sphere_index))
 		return vec();
 	const sphere &hit_sphere = spheres[sphere_index];
@@ -258,7 +255,7 @@ inline std::ostream &operator<<(std::ostream &outs, const lwrite &v)
 	return outs;
 }
 
-bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int width, const int height)
+bool array2bmp(const std::string &filename, const vector<vec> &pixels, const size_t width, const size_t height)
 {
 	std::ofstream f(filename.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
 	if (!f)
@@ -266,9 +263,9 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int
 		return false;
 	}
 	// Write Bmp file headers
-	const int headers_size = 14 + 40;
-	const int padding_size = (4 - ((height * 3) % 4)) % 4;
-	const int pixel_data_size = width * ((height * 3) + padding_size);
+	const size_t headers_size = 14 + 40;
+	const size_t padding_size = (4 - ((height * 3) % 4)) % 4;
+	const size_t pixel_data_size = width * ((height * 3) + padding_size);
 	f.put('B').put('M'); // bfType
 						 // bfSize
 	f << lwrite(headers_size + pixel_data_size, 4);
@@ -283,9 +280,9 @@ bool array2bmp(const std::string &filename, const vector<vec> &pixels, const int
 	// biXPelsPerMeter, biYPelsPerMeter, biClrUsed, biClrImportant
 	f << lwrite(0, 4) << lwrite(0, 4) << lwrite(0, 4) << lwrite(0, 4);
 	// Write image data
-	for (int x = height; x > 0; x--)
+	for (size_t x = height; x > 0; x--)
 	{
-		for (int y = 0; y < width; y++)
+		for (size_t y = 0; y < width; y++)
 		{
 			const auto &val = pixels[((x - 1) * width) + y];
 			f.put(static_cast<char>(int(255.0 * val.z))).put(static_cast<char>(int(255.0 * val.y))).put(static_cast<char>(255.0 * val.x));
@@ -306,8 +303,8 @@ int main(int argc, char **argv)
 	auto get_random_number = bind(distribution, generator);
 
 	// *** These parameters can be manipulated in the algorithm to modify work undertaken ***
-	constexpr int dimension = 512;
-	//int samples = 1; // Algorithm performs 4 * samples per pixel.
+	constexpr size_t dimension = 512;
+	//constexpr size_t samples = 1; // Algorithm performs 4 * samples per pixel.
 	vector<sphere> spheres
 	{
 		sphere(1e5, vec(1e5 + 1, 40.8, 81.6), vec(), vec(0.75, 0.25, 0.25), reflection_type::DIFFUSE),
@@ -326,54 +323,45 @@ int main(int argc, char **argv)
 	vec cx = vec(0.5135);
 	vec cy = (cx.cross(camera.direction)).normal() * 0.5135;
 	vec r;
-	//vector<vec> pixels(dimension * dimension);
-
-	// Create data file
-	ofstream data("Ignore.csv", ofstream::out);
-	unsigned int NUM_THREADS = thread::hardware_concurrency();
-
-	const unsigned int ITERATIONS = 1;
 	vector<vec> pixels(dimension * dimension);
 
-	//vector<int> dimensions = { 256, 512, 1024, 2048, 4096 };
-	vector<int> samples_vec = { 1 };//, 2, 4, 8, 16 };
+	// Create data file
+	ofstream data("samplesOMPdynamic.csv", ofstream::out);
+
+	// Get hardware thread count
+	const unsigned int NUM_THREADS = thread::hardware_concurrency();
+
+	const unsigned int ITERATIONS = 1;
+
+	// Samples to test
+	vector<int> samples_vec = { 128 };//1, 2, 4, 8, 16 };
 
 	for (int & samples : samples_vec)
 	{
-
 		data << "Samples: " << samples * 4 << ",";
-		//data << "Dimension: " << dimension << ",";
 
 		for (unsigned int i = 0; i < ITERATIONS; i++)
 		{
 			auto start = system_clock::now();
 
-			//For each row of pixels.
 			#pragma omp parallel for num_threads(NUM_THREADS) shared(pixels) private(r) schedule(dynamic)
 			for (int y = 0; y < dimension; ++y)
 			{
-				std::cout << "Rendering " << dimension << " * " << dimension << "pixels. Samples:" << samples * 4 << " spp (" << 100.0 * y / (dimension - 1) << ")" << " Iterations : " << i << endl;
-
-				// For each pixel in row
-				int x;
-				for (x = 0; x < dimension; ++x)
+				cout << "Rendering " << dimension << " * " << dimension << "pixels. Samples:" << samples * 4 << " spp (" << 100.0 * y / (dimension - 1) << ")" << " Iterations: " << i << endl;
+				for (size_t x = 0; x < dimension; ++x)
 				{
-
-					for (int sy = 0, i = (dimension - y - 1) * dimension + x; sy < 2; ++sy)
+					for (size_t sy = 0, i = (dimension - y - 1) * dimension + x; sy < 2; ++sy)
 					{
-						for (int sx = 0; sx < 2; ++sx)
+						for (size_t sx = 0; sx < 2; ++sx)
 						{
 							r = vec();
-							//Repeat for sample count.
-
-							for (int s = 0; s < samples; ++s)
+							for (size_t s = 0; s < samples; ++s)
 							{
 								double r1 = 2 * get_random_number(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
 								double r2 = 2 * get_random_number(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
 								vec direction = cx * static_cast<double>(((sx + 0.5 + dx) / 2 + x) / dimension - 0.5) + cy * static_cast<double>(((sy + 0.5 + dy) / 2 + y) / dimension - 0.5) + camera.direction;
 								r = r + radiance(spheres, ray(camera.origin + direction * 140, direction.normal()), 0) * (1.0 / samples);
 							}
-
 							pixels[i] = pixels[i] + vec(clamp(r.x, 0.0, 1.0), clamp(r.y, 0.0, 1.0), clamp(r.z, 0.0, 1.0)) * 0.25;
 						}
 					}
@@ -382,19 +370,13 @@ int main(int argc, char **argv)
 
 			auto end = system_clock::now();
 			auto total = end - start;
-
 			data << ", " << duration_cast<milliseconds>(total).count();
 		}
 
 		data << endl;
 	}
 
-	data.close();
-
-	std::cout << "img.bmp" << (array2bmp("img.bmp", pixels, dimension, dimension) ? " Saved\n" : " Save Failed\n");
-	//std::cout << "Time taken: " << duration_cast<seconds>(total).count() << endl;
-	//int a;
-	//std::cin >> a;
-
+	// Save image
+	cout << "img.bmp" << (array2bmp("img.bmp", pixels, dimension, dimension) ? " Saved\n" : " Save Failed\n");
 	return 0;
 }

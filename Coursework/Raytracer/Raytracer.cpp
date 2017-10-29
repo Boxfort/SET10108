@@ -19,7 +19,7 @@
 using namespace std;
 using namespace std::chrono;
 
-constexpr int MAX_DEPTH = 256; // Upper limit on recursion, increase this on systems with more stack size.
+constexpr int MAX_DEPTH = 512; // Upper limit on recursion, increase this on systems with more stack size.
 constexpr double PI = 3.14159265359;
 
 template <class T, class Compare>
