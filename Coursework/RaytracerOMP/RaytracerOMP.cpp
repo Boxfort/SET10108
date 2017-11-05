@@ -331,10 +331,10 @@ int main(int argc, char **argv)
 	// Get hardware thread count
 	const unsigned int NUM_THREADS = thread::hardware_concurrency();
 
-	const unsigned int ITERATIONS = 1;
+	const unsigned int ITERATIONS = 25;
 
 	// Samples to test
-	vector<int> samples_vec = { 128 };//1, 2, 4, 8, 16 };
+	vector<int> samples_vec = { 1, 2, 4, 8, 16 };
 
 	for (int & samples : samples_vec)
 	{
@@ -344,6 +344,7 @@ int main(int argc, char **argv)
 		{
 			auto start = system_clock::now();
 
+			//Parallelise loop
 			#pragma omp parallel for num_threads(NUM_THREADS) shared(pixels) private(r) schedule(dynamic)
 			for (int y = 0; y < dimension; ++y)
 			{
@@ -368,6 +369,7 @@ int main(int argc, char **argv)
 				}
 			}
 
+			//Calculate runtime
 			auto end = system_clock::now();
 			auto total = end - start;
 			data << ", " << duration_cast<milliseconds>(total).count();
@@ -375,6 +377,9 @@ int main(int argc, char **argv)
 
 		data << endl;
 	}
+
+	//Close data stream
+	data.close();
 
 	// Save image
 	cout << "img.bmp" << (array2bmp("img.bmp", pixels, dimension, dimension) ? " Saved\n" : " Save Failed\n");

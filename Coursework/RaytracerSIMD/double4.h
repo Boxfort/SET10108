@@ -48,15 +48,8 @@ inline static double4 double4_zero() { return _mm256_setzero_pd(); }
 //Returns the dot product of two float4s.
 inline static double double4_dot(double4 lhs, double4 rhs)
 {
-	//double4 f = _mm_dp_ps(lhs, rhs, 0x7f);
-	//return f;
-
 	double4 temp = _mm256_mul_pd(lhs, rhs);
 	double add = double4_get_x(temp) + double4_get_y(temp) + double4_get_z(temp);
-
-	//double4 res = _mm256_add_pd(temp, _mm256_shuffle_pd(temp, temp, 1));
-	//return double4_get_x(res);
-
 	return add;
 }
 
@@ -73,14 +66,6 @@ inline static double4 double4_normalise(double4 v)
 //Returns cross product of two double4 (essentially returns a 3d vector because 4d cross product doesnt exist)
 inline static double4 double4_cross(double4 lhs, double4 rhs)
 {
-	//double4 r = double4_create((double4_get_y(lhs) * double4_get_z(rhs)) - (double4_get_z(lhs) * double4_get_y(rhs)),
-	//	(double4_get_z(lhs) * double4_get_x(rhs)) - (double4_get_x(lhs) * double4_get_z(rhs)),
-	//	(double4_get_x(lhs) * double4_get_y(rhs)) - (double4_get_y(lhs) * double4_get_x(rhs)),
-	//	0.0
-	//);
-	//
-	//return r;
-
 	double4 c = _mm256_permute4x64_pd( _mm256_sub_pd ( _mm256_mul_pd(lhs, _mm256_permute4x64_pd(rhs, _MM_SHUFFLE(3, 0, 2, 1))),
 													   _mm256_mul_pd(rhs, _mm256_permute4x64_pd(lhs, _MM_SHUFFLE(3, 0, 2, 1)))),
 													   _MM_SHUFFLE(3, 0, 2, 1)
