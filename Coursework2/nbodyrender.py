@@ -9,12 +9,12 @@ import math
 FILENAME = "Coursework2/data.csv"
 IMAGE_PREFIX = "Images/IMG"
 IMAGE_TYPE = "PNG"
-IMAGE_DIM = (512, 512)
+IMAGE_DIM = (1920, 1080)
 MODE = "RGB"
-ELLIPSE_SIZE = 0.01
-VEL_MUL = 1.05
-N = 1000
-IMAGES = 5000
+ELLIPSE_SIZE = 0.5
+VEL_MUL = 2.0
+N = 100
+IMAGES = 1000
 PI = 3.14159265358979323846
 
 def clamp(value, lo, hi):
@@ -37,18 +37,19 @@ if __name__ == '__main__':
     with open(FILENAME, 'r') as file:
         reader = csv.reader(file)
         for row in reader:
-            size = float(row[5]) * ELLIPSE_SIZE #math.sqrt(float(row[5]) / PI) * ELLIPSE_SIZE
-            x1 = ((float(row[1]) * (IMAGE_DIM[0])/2) + IMAGE_DIM[0] / 2) - (size/2)
-            y1 = ((float(row[2]) * (IMAGE_DIM[1])/2) + IMAGE_DIM[1] / 2) - (size/2)
-            x2 = ((float(row[1]) * (IMAGE_DIM[0])/2) + IMAGE_DIM[0] / 2) + (size/2)
-            y2 = ((float(row[2]) * (IMAGE_DIM[1])/2) + IMAGE_DIM[1] / 2) + (size/2)
-            draw.ellipse((x1, y1, x2, y2), fill=(255, 255 - int(clamp(abs((float(row[3]) + float(row[4]))/2) * 14000, 0, 255)), 255 - int(clamp((abs(float(row[3]) + float(row[4]))/2) * 14000, 0, 255))))
+            if float(row[5]) != 0:
+                size = math.sqrt(float(row[5]) / PI) * ELLIPSE_SIZE #float(row[5]) * ELLIPSE_SIZE #
+                x1 = ((float(row[1]) * (IMAGE_DIM[0])/2) + IMAGE_DIM[0] / 2) - (size/2)
+                y1 = ((float(row[2]) * (IMAGE_DIM[1])/2) + IMAGE_DIM[1] / 2) - (size/2)
+                x2 = ((float(row[1]) * (IMAGE_DIM[0])/2) + IMAGE_DIM[0] / 2) + (size/2)
+                y2 = ((float(row[2]) * (IMAGE_DIM[1])/2) + IMAGE_DIM[1] / 2) + (size/2)
+                draw.ellipse((x1, y1, x2, y2), fill=(255, 255 - int(clamp(abs((float(row[3]) + float(row[4]))/2) * 100000, 0, 255)), 255 - int(clamp((abs(float(row[3]) + float(row[4]))/2) * 100000, 0, 255))))
 
-            x1 = (float(row[1]) * IMAGE_DIM[0]/2) + (IMAGE_DIM[0] / 2)
-            y1 = (float(row[2]) * IMAGE_DIM[1]/2) + (IMAGE_DIM[1] / 2)
-            x2 = (((float(row[1]) - float(row[3])) * IMAGE_DIM[0]/2) * VEL_MUL) + (IMAGE_DIM[0] / 2)
-            y2 = (((float(row[2]) - float(row[4])) * IMAGE_DIM[1]/2) * VEL_MUL) + (IMAGE_DIM[1] / 2)
-            draw.line((x1, y1, x2, y2), fill=128, width=1)
+            #x1 = (float(row[1]) * IMAGE_DIM[0]/2) + (IMAGE_DIM[0] / 2)
+            #y1 = (float(row[2]) * IMAGE_DIM[1]/2) + (IMAGE_DIM[1] / 2)
+            #x2 = (((float(row[1]) - float(row[3])) * IMAGE_DIM[0]/2) * VEL_MUL) + (IMAGE_DIM[0] / 2)
+            #y2 = (((float(row[2]) - float(row[4])) * IMAGE_DIM[1]/2) * VEL_MUL) + (IMAGE_DIM[1] / 2)
+            #draw.line((x1, y1, x2, y2), fill=128, width=1)
             count += 1
             if count == (N):
                 count = 0
