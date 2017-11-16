@@ -288,3 +288,5 @@ __pycache__/
 *.xsd.cs
 Coursework2/NBodyBruteCUDA/Source.cpp
 *.vcxproj
+*.sln
+*.vcxproj
