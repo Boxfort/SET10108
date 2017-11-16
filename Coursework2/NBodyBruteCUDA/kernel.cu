@@ -37,38 +37,30 @@ __global__ void n_body(unsigned int *iterations, float *pi, curandState *state)
 	unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	unsigned int start = idx * iterations[0];
 	unsigned int end = start + iterations[0];
-
-	curand_init(111, idx, 0, &state[idx]);  // Initialize CURAND
-
-											//Set start result to 0
-	unsigned int points_in_circle = 0;
-
-	for (unsigned int i = start; i < end; ++i)
-	{
-		//Get point to work on
-		float2 point = make_float2(curand_uniform(&state[idx]), curand_uniform(&state[idx]));
-		// Calculate length
-		float l = sqrtf((point.x * point.x) + (point.y * point.y));
-		// Check if length and add to result accordingly
-		if (l <= 1.0f)
-			++points_in_circle;
-	}
-
-	pi[idx] = 4.0f * points_in_circle / (float)iterations[0]; // return estimate of pi
 }
 
 void initBodies(float2* pos, float2* vel, float* mass)
 {
+	float* random_pos;
+	float* random_mass;
+	cudaMallocHost((void **)&random_pos,  (sizeof(float) * N) * 2);
+	cudaMallocHost((void **)&random_mass, (sizeof(float) * N));
+
 	curandGenerator_t rnd;
 	curandCreateGenerator(&rnd, CURAND_RNG_QUASI_SOBOL32);
+	curandSetQuasiRandomGeneratorDimensions(rnd, 1);
+	curandSetGeneratorOrdering(rnd, CURAND_ORDERING_QUASI_DEFAULT);
+
+	curandGenerateUniform(rnd, (float*)random_pos, N * 2);
+	curandGenerateUniform(rnd, (float*)random_mass, N);
 
 	for (int i = 1; i < N; i++)
 	{
-		pos[i].x = 2.0f * (rand() / (double)RAND_MAX) - 1.0f; // Init at position between -1 : 1
-		pos[i].y = 2.0f * (rand() / (double)RAND_MAX) - 1.0f; // Init at position between -1 : 1
+		pos[i].x = (2.0f * random_pos[i]) - 1.0f; // Init at position between -1 : 1
+		pos[i].y = (2.0f * random_pos[i + 1]) - 1.0f; // Init at position between -1 : 1
 		vel[i].x = 0;
 		vel[i].y = 0;
-		mass[i]  = rand() % (500 - 100 + 1) + 100;
+		mass[i]  = static_cast<int>(random_mass[i]) % (500 - 100 + 1) + 100;
 	}
 
 	pos[0].x = 0;
@@ -87,7 +79,7 @@ int main()
 	// Declare host memory 
 	float2 *host_pos;			// out
 	float2 *host_vel;			// out
-	float  *host_mass;			// out
+	float  *host_mass;			// in
 	int	   *host_iterations;	// in
 
 	// Allocate host memory
@@ -97,14 +89,14 @@ int main()
 	cudaMallocHost((void **)&host_iterations, (sizeof(unsigned int)));
 
 	// Initialise host memory
-	// Random points
+	initBodies(host_pos, host_vel, host_mass);
 	host_iterations[0] = ITERS;
 
 	// Declare device memory
-	float2 *dev_pos;			// out
-	float2 *dev_vel;			// out
-	float  *dev_mass;			// out
-	int    *dev_iterations;		// in
+	float2		 *dev_pos;			// out
+	float2		 *dev_vel;			// out
+	float		 *dev_mass;			// in
+	unsigned int *dev_iterations;	// in
 
 	// Allocate device memory
 	cudaMalloc((void**)&dev_pos,		(sizeof(float2) * N) * ITERS);
@@ -113,34 +105,25 @@ int main()
 	cudaMalloc((void**)&dev_iterations, (sizeof(unsigned int)));
 
 	//Copy memory from host to device
-	cudaMemcpy(buffer_pi_values, &pi_values[0], data_size, cudaMemcpyHostToDevice);
-	cudaMemcpy(buffer_pi_values, &pi_values[0], data_size, cudaMemcpyHostToDevice);
-	cudaMemcpy(buffer_pi_values, &pi_values[0], data_size, cudaMemcpyHostToDevice);
-	cudaMemcpy(buffer_pi_values, &pi_values[0], data_size, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_pos,		   &host_pos[0],		(sizeof(float2) * N) * ITERS, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_vel,		   &host_vel[0],		(sizeof(float2) * N) * ITERS, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_mass,	   &host_mass[0],		(sizeof(float) * N)  * ITERS, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_iterations, &host_iterations[0], (sizeof(unsigned int)),		  cudaMemcpyHostToDevice);
 
 	// Execute Kernel
-	monte_carlo_pi << <1, THREADS >> >(buffer_points_per_thread, buffer_pi_values, devStates);
+	n_body << <BLOCKS, THREADS >> >(dev_pos, dev_vel, dev_mass, dev_iterations);
 
 	// Wait for kernal to complete
 	cudaDeviceSynchronize();
 
 	// Read output buffer to host
-	cudaMemcpy(&pi_values[0], buffer_pi_values, data_size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&host_pos[0], dev_pos, (sizeof(float2) * N) * ITERS, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&host_vel[0], dev_vel, (sizeof(float2) * N) * ITERS, cudaMemcpyDeviceToHost);
 
-	float pi_estimate = 0.0f;
-
-	for (int i = 0; i < THREADS; i++)
-	{
-		pi_estimate += pi_values[i];
-	}
-
-	pi_estimate /= THREADS;
-
-	cout << "pi = " << pi_estimate << endl;
-
-	cudaFree(buffer_pi_values);
-	cudaFree(buffer_points_per_thread);
-	cudaFree(devStates);
+	cudaFree(dev_pos);
+	cudaFree(dev_vel);
+	cudaFree(dev_mass);
+	cudaFree(dev_iterations);
 
 	int a;
 	cin >> a;
