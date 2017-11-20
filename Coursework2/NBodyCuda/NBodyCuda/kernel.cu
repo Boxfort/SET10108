@@ -82,7 +82,7 @@ __global__ void n_body(float2* pos, float2* vel, float* mass, unsigned int* n, u
 	}
 }
 
-void initBodies(float2* pos, float2* vel, float* mass)
+void initBodies(float2* pos, float2* vel, float* mass, unsigned int N)
 {
 	float* random_pos;
 	float* random_mass;
@@ -118,19 +118,19 @@ void initBodies(float2* pos, float2* vel, float* mass)
 int main()
 {
 	ofstream file;
-	file.open("NTimings.csv");
 
+	file.open("CUDATimings.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 100, 250, 500, 1000, 5000 };
-	vector<int> chunks_vec = { 1, 10, 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 10;
+	vector<int> bodies_vec = { 1000 }; //100, 250, 500, 1000, 5000 };
+	vector<int> chunks_vec = { 10, 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 1;
 
 	for (int & bodies : bodies_vec)
 	{
 		for (int & chunks : chunks_vec)
 		{
-			file << bodies << "," << chunks << "," << endl;
+			file << bodies << "," << chunks << ",";
 
 			for (int t = 0; t < timing_iterations; t++)
 			{
@@ -141,10 +141,11 @@ int main()
 				const unsigned int BLOCKS = ceil(N / THREADS) + 1;			// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;					// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;   // Calculated size of iteration chunks
+				
 
 				//Init CUDA - select device
 				cudaSetDevice(0);
-				cuda_info();
+				//cuda_info();
 
 				// Declare host memory 
 				float2		 *host_pos;			// out
@@ -161,7 +162,7 @@ int main()
 				cudaMallocHost((void **)&host_iters, (sizeof(unsigned int)));
 
 				// Initialise host memory
-				initBodies(host_pos, host_vel, host_mass);
+				initBodies(host_pos, host_vel, host_mass, N);
 				host_n[0] = N;
 				host_iters[0] = ITER_CHUNK_SIZE;
 
@@ -181,17 +182,16 @@ int main()
 
 				auto start = system_clock::now();
 
+				//Copy memory from host to device
+				cudaMemcpy(dev_pos, &host_pos[0], (sizeof(float2) * N) * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
+				cudaMemcpy(dev_vel, &host_vel[0], (sizeof(float2) * N)  * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
+				cudaMemcpy(dev_mass, &host_mass[0], (sizeof(float)  * N), cudaMemcpyHostToDevice);
+				cudaMemcpy(dev_n, &host_n[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
+				cudaMemcpy(dev_iters, &host_iters[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
+
 				// TODO: Call Kernel once, then call with dev_memory
 				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
-					//Copy memory from host to device
-					cudaMemcpy(dev_pos, &host_pos[0], (sizeof(float2) * N) * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
-					cudaMemcpy(dev_vel, &host_vel[0], (sizeof(float2) * N)  * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
-					cudaMemcpy(dev_mass, &host_mass[0], (sizeof(float)  * N), cudaMemcpyHostToDevice);
-					cudaMemcpy(dev_n, &host_n[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
-					cudaMemcpy(dev_iters, &host_iters[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
-
-
 					// Execute Kernel
 					n_body << <BLOCKS, THREADS >> > (dev_pos, dev_vel, dev_mass, dev_n, dev_iters);
 
@@ -203,6 +203,7 @@ int main()
 					cudaMemcpy(&host_vel[0], dev_vel, (sizeof(float2) * N) * ITER_CHUNK_SIZE, cudaMemcpyDeviceToHost);
 
 					// Write to file
+					/*
 					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
 					{
 						for (int k = 0; k < N; k++)
@@ -215,6 +216,7 @@ int main()
 								int i = 0;
 						}
 					}
+					*/
 				}
 
 				auto end = system_clock::now();
