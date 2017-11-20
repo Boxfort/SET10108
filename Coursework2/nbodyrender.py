@@ -1,19 +1,19 @@
 # Jack Anderson 2017
 # Takes in dataset generated from N-body simulation and renders it to an .mp4 video.
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import numpy, cv2
 import csv
 import math
 
-FILENAME = "Coursework2/data.csv"
+FILENAME = "NBodyCuda/NBodyCuda/data.csv"
 IMAGE_PREFIX = "Images/IMG"
 IMAGE_TYPE = "PNG"
 IMAGE_DIM = (1920, 1080)
 MODE = "RGB"
 ELLIPSE_SIZE = 0.5
 VEL_MUL = 2.0
-N = 100
+N = 1000
 IMAGES = 1000
 PI = 3.14159265358979323846
 
@@ -29,7 +29,8 @@ if __name__ == '__main__':
     image = Image.new(MODE, IMAGE_DIM)
     draw = ImageDraw.Draw(image)
 
-    video = cv2.VideoWriter("nbody.mp4", cv2.VideoWriter_fourcc(*'DIVX'), 100, IMAGE_DIM)
+    video = cv2.VideoWriter("nbodyCUDA.mp4", cv2.VideoWriter_fourcc(*'DIVX'), 100, IMAGE_DIM)
+    fnt = ImageFont.truetype('C:/Users/Jack/Documents/Curse/Minecraft/Install/runtime/jre-x64/1.8.0_25/lib/fonts/LucidaTypewriterRegular.ttf', 10)
 
     count = 0
     image_num = 0
@@ -44,6 +45,7 @@ if __name__ == '__main__':
                 x2 = ((float(row[1]) * (IMAGE_DIM[0])/2) + IMAGE_DIM[0] / 2) + (size/2)
                 y2 = ((float(row[2]) * (IMAGE_DIM[1])/2) + IMAGE_DIM[1] / 2) + (size/2)
                 draw.ellipse((x1, y1, x2, y2), fill=(255, 255 - int(clamp(abs((float(row[3]) + float(row[4]))/2) * 100000, 0, 255)), 255 - int(clamp((abs(float(row[3]) + float(row[4]))/2) * 100000, 0, 255))))
+                #draw.text((x1, y1), str(count), font=fnt, fill=(255,255,255,255))
 
             #x1 = (float(row[1]) * IMAGE_DIM[0]/2) + (IMAGE_DIM[0] / 2)
             #y1 = (float(row[2]) * IMAGE_DIM[1]/2) + (IMAGE_DIM[1] / 2)
