@@ -42,7 +42,7 @@ __global__ void n_body(float2* pos, float2* vel, float* mass, unsigned int* n, u
 	// Calculate index
 	unsigned int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	double fx = 0.0, fy = 0.0;
+	float fx = 0.0, fy = 0.0;
 	int offset = 0;
 
 	// Ensure the extra threads asigned are not run to prevent heap corruption.
@@ -59,11 +59,11 @@ __global__ void n_body(float2* pos, float2* vel, float* mass, unsigned int* n, u
 
 				int body1 = j + ((i - offset) * n[0]);
 
-				double dx = pos[body1].x - pos[body2].x;
-				double dy = pos[body1].y - pos[body2].y;
-				double distance = sqrt(dx*dx + dy*dy + DAMPENING);
-
-				double force = G * (mass[body1] * (mass[body2] / distance));
+				float dx = pos[body1].x - pos[body2].x;
+				float dy = pos[body1].y - pos[body2].y;
+				float distance = sqrt(dx*dx + dy*dy + DAMPENING);
+				
+				float force = G * (mass[body1] * (mass[body2] / distance));
 
 				fx += force * (dx / distance);
 				fy += force * (dy / distance);
