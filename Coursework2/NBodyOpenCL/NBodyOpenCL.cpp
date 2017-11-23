@@ -8,8 +8,10 @@
 #include <fstream>
 #include <sstream>
 #include <array>
+#include <chrono>
 
 using namespace std;
+using namespace std::chrono;
 
 void initialise_opencl(vector<cl_platform_id> &platforms, vector<cl_device_id> &devices, cl_context &context, cl_command_queue &cmd_queue)
 {
@@ -132,7 +134,7 @@ int main()
 	file.open("OpenCLTimings.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 100, 250, 500, 1000, 5000 };
+	vector<int> bodies_vec = { 1024 }; //, 250, 500, 1000, 5000 };
 	vector<int> chunks_vec = { 10, 25, 50, 100, 500, 1000 };
 	unsigned int timing_iterations = 1;
 
@@ -147,11 +149,11 @@ int main()
 
 				// Variables to change
 				const unsigned int N = bodies;
-				const unsigned int ITERS = 1000;								// Number of simulation iterations.
-				const size_t LOCAL_WORK_SIZE = 64;								// Number of threads per block.
-				const size_t GLOBAL_WORK_SIZE = ceil(N / LOCAL_WORK_SIZE) + 1;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
-				const unsigned int ITER_CHUNKS = chunks;						// Number of chunks to seperate iterations into
-				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;		// Calculated size of iteration chunks
+				const unsigned int ITERS = 1000;												// Number of simulation iterations.
+				const size_t LOCAL_WORK_SIZE = 256;												// Number of threads per block.
+				const size_t GLOBAL_WORK_SIZE = ceil(N / LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
+				const unsigned int ITER_CHUNKS = chunks;										// Number of chunks to seperate iterations into
+				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;						// Calculated size of iteration chunks
 
 				// Status of OpenCl calls
 				cl_int status;
@@ -165,8 +167,8 @@ int main()
 
 				//print_opencl_info(devices);
 
-				auto program = load_program("simply_multiply.cl", context, devices[0], devices.size());
-				auto kernel = clCreateKernel(program, "simply_multiply", &status);
+				auto program = load_program("nbody.cl", context, devices[0], devices.size());
+				auto kernel = clCreateKernel(program, "nbody", &status);
 
 				// Declare host memory 
 				float		 *host_pos_x;		// out
@@ -209,31 +211,76 @@ int main()
 				dev_n     = clCreateBuffer(context, CL_MEM_READ_ONLY,  (sizeof(unsigned int)),				  nullptr, &status);
 				dev_iters = clCreateBuffer(context, CL_MEM_READ_ONLY,  (sizeof(unsigned int)),				  nullptr, &status);
 
-				// Copy host data to device data
-				status = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_FALSE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_FALSE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_FALSE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_FALSE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_mass,  CL_FALSE, 0, (sizeof(float) * N),					host_mass,	0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_n,		CL_FALSE, 0, (sizeof(unsigned int)),				host_n,		0, nullptr, nullptr);
-				status = clEnqueueWriteBuffer(cmd_queue, dev_iters, CL_FALSE, 0, (sizeof(unsigned int)),				host_iters, 0, nullptr, nullptr);
+				auto start = system_clock::now();
 
-				status = clSetKernelArg(kernel, 0, sizeof(cl_mem), &dev_pos_x); 
-				status = clSetKernelArg(kernel, 1, sizeof(cl_mem), &dev_pos_y); 
-				status = clSetKernelArg(kernel, 2, sizeof(cl_mem), &dev_vel_x); 
-				status = clSetKernelArg(kernel, 3, sizeof(cl_mem), &dev_vel_y); 
-				status = clSetKernelArg(kernel, 4, sizeof(cl_mem), &dev_mass);	
-				status = clSetKernelArg(kernel, 5, sizeof(cl_mem), &dev_n);		
-				status = clSetKernelArg(kernel, 6, sizeof(cl_mem), &dev_iters); 
+				// Copy host data to device data
+				status  = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_mass,  CL_TRUE, 0, (sizeof(float) * N),					host_mass,	0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_n,	 CL_TRUE, 0, (sizeof(unsigned int)),				host_n,		0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_iters, CL_TRUE, 0, (sizeof(unsigned int)),				host_iters, 0, nullptr, nullptr);
+
+				if (status != CL_SUCCESS) {
+					fprintf(stderr, "Write Buffer Failed\n");
+					int a;
+					cin >> a;
+					return status;
+				}
+
+				status  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &dev_pos_x); 
+				status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &dev_pos_y); 
+				status |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &dev_vel_x); 
+				status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &dev_vel_y); 
+				status |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &dev_mass);	
+				status |= clSetKernelArg(kernel, 5, sizeof(cl_mem), &dev_n);		
+				status |= clSetKernelArg(kernel, 6, sizeof(cl_mem), &dev_iters); 
+
+				if (status != CL_SUCCESS) {
+					fprintf(stderr, "Kernal Arg Failed\n");
+					int a;
+					cin >> a;
+					return status;
+				}
 
 				// Enqueue the kernel for execution
 				status = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, nullptr, &GLOBAL_WORK_SIZE, &LOCAL_WORK_SIZE, 0, nullptr, nullptr);
+
+				if (status != CL_SUCCESS) {
+					fprintf(stderr, "Executing kernel failed\n");
+					cout << status << endl;
+					int a;
+					cin >> a;
+					return status;
+				}
+
+				clFinish(cmd_queue);
 
 				// Read output buffer from GPU to Host mem
 				clEnqueueReadBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
 				clEnqueueReadBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
 				clEnqueueReadBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
 				clEnqueueReadBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
+
+				/*
+				// Write to file
+				for (int i = 0; i < ITER_CHUNK_SIZE; i++)
+				{
+					for (int k = 0; k < N; k++)
+					{
+						unsigned int j = k + (i * N);
+
+						file << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[j] << endl;
+
+					}
+				}
+				*/
+
+				auto end = system_clock::now();
+				auto total = end - start;
+				cout << "Bodies: " << N << " Chunks: " << ITER_CHUNKS << " Time Taken: " << duration_cast<milliseconds>(total).count() << "ms" << endl;
+				file << duration_cast<milliseconds>(total).count() << ",";
 
 				// Free mallocs
 				free(host_pos_x);
@@ -256,13 +303,10 @@ int main()
 				clReleaseContext(context);
 				clReleaseKernel(kernel);
 				clReleaseProgram(program);
-
 			}
 		}
 	}
 
-	int a;
-	cin >> a;
 
 	return 0;
 }

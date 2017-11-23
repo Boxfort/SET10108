@@ -1,4 +1,8 @@
-__kernel void simply_multiply(__global__ float* pos_x, __global__ float* pos_y, __global__ float* vel_x, __global__ float* vel_y, __global__ float* mass, __global__ unsigned int* n, __global__ unsigned int* iterations)
+__constant float DAMPENING = 1e-9;
+__constant float TIME_STEP = 1.0;
+__constant float G = 6.674e-11;
+
+__kernel void nbody(__global float* pos_x, __global float* pos_y, __global float* vel_x, __global float* vel_y, __global float* mass, __global unsigned int* n, __global unsigned int* iterations)
 {
 	// Calculate index
 	int idx = get_global_id(0);
@@ -20,8 +24,8 @@ __kernel void simply_multiply(__global__ float* pos_x, __global__ float* pos_y, 
 
 				int body1 = j + ((i - offset) * n[0]);
 
-				float dx = pos[body1].x - pos[body2].x;
-				float dy = pos[body1].y - pos[body2].y;
+				float dx = pos_x[body1] - pos_x[body2];
+				float dy = pos_y[body1] - pos_y[body2];
 				float distance = sqrt(dx*dx + dy*dy + DAMPENING);
 				
 				float force = G * (mass[body1] * (mass[body2] / distance));
@@ -30,13 +34,11 @@ __kernel void simply_multiply(__global__ float* pos_x, __global__ float* pos_y, 
 				fy += force * (dy / distance);
 			}
 
-			vel[body2].x += TIME_STEP * (fx / mass[body2]);
-			vel[body2].y += TIME_STEP * (fy / mass[body2]);
+			vel_x[body2] += TIME_STEP * (fx / mass[body2]);
+			vel_y[body2] += TIME_STEP * (fy / mass[body2]);
 
-			pos[body2].x += TIME_STEP * vel[body2].x;
-			pos[body2].y += TIME_STEP * vel[body2].y;
-
-			__syncthreads();
+			pos_x[body2] += TIME_STEP * vel_x[body2];
+			pos_y[body2] += TIME_STEP * vel_y[body2];
 
 			offset = -1;
 		}
