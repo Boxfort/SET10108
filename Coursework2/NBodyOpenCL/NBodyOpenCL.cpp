@@ -129,13 +129,14 @@ void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y , float* 
 
 int main()
 {
-	ofstream file;
+	ofstream file, data;
 
 	file.open("OpenCLTimings.csv");
+	data.open("data.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 1024 }; //, 250, 500, 1000, 5000 };
-	vector<int> chunks_vec = { 10, 25, 50, 100, 500, 1000 };
+	vector<int> bodies_vec = { 512 }; // , 1024, 5120};
+	vector<int> chunks_vec = { 10 };//, 25, 50, 100, 500, 1000 };
 	unsigned int timing_iterations = 1;
 
 	for (int & bodies : bodies_vec)
@@ -150,7 +151,7 @@ int main()
 				// Variables to change
 				const unsigned int N = bodies;
 				const unsigned int ITERS = 1000;												// Number of simulation iterations.
-				const size_t LOCAL_WORK_SIZE = 256;												// Number of threads per block.
+				const size_t LOCAL_WORK_SIZE = 512;												// Number of threads per block.
 				const size_t GLOBAL_WORK_SIZE = ceil(N / LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;										// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;						// Calculated size of iteration chunks
@@ -244,38 +245,43 @@ int main()
 					return status;
 				}
 
-				// Enqueue the kernel for execution
-				status = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, nullptr, &GLOBAL_WORK_SIZE, &LOCAL_WORK_SIZE, 0, nullptr, nullptr);
-
-				if (status != CL_SUCCESS) {
-					fprintf(stderr, "Executing kernel failed\n");
-					cout << status << endl;
-					int a;
-					cin >> a;
-					return status;
-				}
-
-				clFinish(cmd_queue);
-
-				// Read output buffer from GPU to Host mem
-				clEnqueueReadBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
-				clEnqueueReadBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
-				clEnqueueReadBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
-				clEnqueueReadBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
-
-				/*
-				// Write to file
-				for (int i = 0; i < ITER_CHUNK_SIZE; i++)
+				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
-					for (int k = 0; k < N; k++)
-					{
-						unsigned int j = k + (i * N);
 
-						file << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[j] << endl;
+					// Enqueue the kernel for execution
+					status = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, nullptr, &GLOBAL_WORK_SIZE, &LOCAL_WORK_SIZE, 0, nullptr, nullptr);
 
+					if (status != CL_SUCCESS) {
+						fprintf(stderr, "Executing kernel failed\n");
+						cout << status << endl;
+						int a;
+						cin >> a;
+						return status;
 					}
+
+					clFinish(cmd_queue);
+
+					// Read output buffer from GPU to Host mem
+					clEnqueueReadBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
+					clEnqueueReadBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
+					clEnqueueReadBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
+					clEnqueueReadBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
+
+					// Write to file
+					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
+					{
+						for (int k = 0; k < N; k++)
+						{
+							unsigned int j = k + (i * N);
+
+							data << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[j] << endl;
+
+						}
+					}
+					
 				}
-				*/
+
+				data.close();
 
 				auto end = system_clock::now();
 				auto total = end - start;
@@ -304,9 +310,13 @@ int main()
 				clReleaseKernel(kernel);
 				clReleaseProgram(program);
 			}
+
+			file << endl;
 		}
 	}
 
+	int a;
+	cin >> a;
 
 	return 0;
 }
