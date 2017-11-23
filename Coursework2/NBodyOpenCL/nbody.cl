@@ -15,14 +15,15 @@ __kernel void nbody(__global float* pos_x, __global float* pos_y, __global float
 	{
 		for (int i = 0; i < iterations[0]; i++)
 		{
-			int body2 = idx + ((i - offset) * n[0]);
+			int body2 = idx + ((i + offset) * n[0]);
+			int body2w = idx + (i * n[0]);
 
 			// For each body
 			for (int j = 0; j < n[0]; j++)
 			{
 				//if (idx == j) { continue; }
 
-				int body1 = j + ((i - offset) * n[0]);
+				int body1 = j + ((i + offset) * n[0]);
 
 				float dx = pos_x[body1] - pos_x[body2];
 				float dy = pos_y[body1] - pos_y[body2];
@@ -34,11 +35,17 @@ __kernel void nbody(__global float* pos_x, __global float* pos_y, __global float
 				fy += force * (dy / distance);
 			}
 
-			vel_x[body2] += TIME_STEP * (fx / mass[body2]);
-			vel_y[body2] += TIME_STEP * (fy / mass[body2]);
+			vel_x[body2w] = vel_x[body2];
+			vel_y[body2w] = vel_y[body2];
+			pos_x[body2w] = pos_x[body2];
+			pos_y[body2w] = pos_y[body2];
 
-			pos_x[body2] += TIME_STEP * vel_x[body2];
-			pos_y[body2] += TIME_STEP * vel_y[body2];
+
+			vel_x[body2w] += TIME_STEP * (fx / mass[i]);
+			vel_y[body2w] += TIME_STEP * (fy / mass[i]);
+
+			pos_x[body2w] += TIME_STEP * vel_x[body2w];
+			pos_y[body2w] += TIME_STEP * vel_y[body2w];
 
 			offset = -1;
 		}
