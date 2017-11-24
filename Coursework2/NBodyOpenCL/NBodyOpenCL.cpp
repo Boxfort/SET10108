@@ -29,11 +29,12 @@ void initialise_opencl(vector<cl_platform_id> &platforms, vector<cl_device_id> &
 	// Assume platform 0 is the one we want to use
 	// Get devies for platform 0
 	cl_uint num_devices;
-	status = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 0, nullptr, &num_devices);
+	status = clGetDeviceIDs(platforms[1], CL_DEVICE_TYPE_GPU, 0, nullptr, &num_devices);
+
 	// Resize vector to store devices
 	devices.resize(num_devices);
 	// Fill in devices vector
-	status = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, num_devices, &devices[0], nullptr);
+	status = clGetDeviceIDs(platforms[1], CL_DEVICE_TYPE_GPU, num_devices, &devices[0], nullptr);
 
 	// Create a context
 	context = clCreateContext(nullptr, num_devices, &devices[0], nullptr, nullptr, &status);
@@ -111,7 +112,7 @@ cl_program load_program(const string &filename, cl_context &context, cl_device_i
 
 void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y , float* mass, unsigned int N)
 {
-	for (int i = 1; i < N; i++)
+	for (int i = 0; i < N; i++)
 	{
 		pos_x[i] = 2.0f * (rand() / (double)RAND_MAX) - 1.0f;//(2.0f * random_pos[i])     - 1.0f; // Init at position between -1 : 1
 		pos_y[i] = 2.0f * (rand() / (double)RAND_MAX) - 1.0f;//(2.0f * random_pos[i + 1]) - 1.0f; // Init at position between -1 : 1
@@ -122,9 +123,7 @@ void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y , float* 
 
 	pos_x[0] = 0;
 	pos_y[0] = 0;
-	vel_x[0] = 0.0;
-	vel_y[0] = 0.0;
-	mass[0] = 3000;
+	mass[0] = 4000;
 }
 
 int main()
@@ -135,9 +134,9 @@ int main()
 	data.open("data.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 512 }; // , 1024, 5120};
-	vector<int> chunks_vec = { 10 };//, 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 1;
+	vector<int> bodies_vec = { 512, 1024, 5120};
+	vector<int> chunks_vec = { 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 10;
 
 	for (int & bodies : bodies_vec)
 	{
@@ -215,13 +214,13 @@ int main()
 				auto start = system_clock::now();
 
 				// Copy host data to device data
-				status  = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
+				status = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
 				status |= clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
 				status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
 				status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
-				status |= clEnqueueWriteBuffer(cmd_queue, dev_mass,  CL_TRUE, 0, (sizeof(float) * N),					host_mass,	0, nullptr, nullptr);
-				status |= clEnqueueWriteBuffer(cmd_queue, dev_n,	 CL_TRUE, 0, (sizeof(unsigned int)),				host_n,		0, nullptr, nullptr);
-				status |= clEnqueueWriteBuffer(cmd_queue, dev_iters, CL_TRUE, 0, (sizeof(unsigned int)),				host_iters, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_mass, CL_TRUE, 0, (sizeof(float) * N), host_mass, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_n, CL_TRUE, 0, (sizeof(unsigned int)), host_n, 0, nullptr, nullptr);
+				status |= clEnqueueWriteBuffer(cmd_queue, dev_iters, CL_TRUE, 0, (sizeof(unsigned int)), host_iters, 0, nullptr, nullptr);
 
 				if (status != CL_SUCCESS) {
 					fprintf(stderr, "Write Buffer Failed\n");
@@ -230,23 +229,23 @@ int main()
 					return status;
 				}
 
-				status  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &dev_pos_x); 
-				status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &dev_pos_y); 
-				status |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &dev_vel_x); 
-				status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &dev_vel_y); 
-				status |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &dev_mass);	
-				status |= clSetKernelArg(kernel, 5, sizeof(cl_mem), &dev_n);		
-				status |= clSetKernelArg(kernel, 6, sizeof(cl_mem), &dev_iters); 
-
-				if (status != CL_SUCCESS) {
-					fprintf(stderr, "Kernal Arg Failed\n");
-					int a;
-					cin >> a;
-					return status;
-				}
+				status = clSetKernelArg(kernel, 0, sizeof(cl_mem), &dev_pos_x);
+				status |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &dev_pos_y);
+				status |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &dev_vel_x);
+				status |= clSetKernelArg(kernel, 3, sizeof(cl_mem), &dev_vel_y);
+				status |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &dev_mass);
+				status |= clSetKernelArg(kernel, 5, sizeof(cl_mem), &dev_n);
+				status |= clSetKernelArg(kernel, 6, sizeof(cl_mem), &dev_iters);
 
 				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
+
+					if (status != CL_SUCCESS) {
+						fprintf(stderr, "Kernal Arg Failed\n");
+						int a;
+						cin >> a;
+						return status;
+					}
 
 					// Enqueue the kernel for execution
 					status = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, nullptr, &GLOBAL_WORK_SIZE, &LOCAL_WORK_SIZE, 0, nullptr, nullptr);
@@ -267,6 +266,7 @@ int main()
 					clEnqueueReadBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
 					clEnqueueReadBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
 
+					/*
 					// Write to file
 					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
 					{
@@ -274,11 +274,27 @@ int main()
 						{
 							unsigned int j = k + (i * N);
 
-							data << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[j] << endl;
+							data << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[k] << endl;
 
 						}
 					}
+					*/
 					
+					// TODO: Copy final iteration to first iteration
+					for (int i = 0; i < N; i++)
+					{
+						host_pos_x[i] = host_pos_x[i + ((ITER_CHUNK_SIZE-1) * N)];
+						host_pos_y[i] = host_pos_y[i + ((ITER_CHUNK_SIZE-1) * N)];
+						host_vel_x[i] = host_vel_x[i + ((ITER_CHUNK_SIZE-1) * N)];
+						host_vel_y[i] = host_vel_y[i + ((ITER_CHUNK_SIZE-1) * N)];
+					}
+					
+
+					// Copy host data to device data
+					status = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N), host_pos_x, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N), host_pos_y, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N), host_vel_x, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N), host_vel_y, 0, nullptr, nullptr);
 				}
 
 				data.close();

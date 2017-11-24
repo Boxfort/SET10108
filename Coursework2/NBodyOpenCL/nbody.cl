@@ -21,8 +21,6 @@ __kernel void nbody(__global float* pos_x, __global float* pos_y, __global float
 			// For each body
 			for (int j = 0; j < n[0]; j++)
 			{
-				//if (idx == j) { continue; }
-
 				int body1 = j + ((i + offset) * n[0]);
 
 				float dx = pos_x[body1] - pos_x[body2];
@@ -41,8 +39,8 @@ __kernel void nbody(__global float* pos_x, __global float* pos_y, __global float
 			pos_y[body2w] = pos_y[body2];
 
 
-			vel_x[body2w] += TIME_STEP * (fx / mass[i]);
-			vel_y[body2w] += TIME_STEP * (fy / mass[i]);
+			vel_x[body2w] += TIME_STEP * (fx / mass[idx]);
+			vel_y[body2w] += TIME_STEP * (fy / mass[idx]);
 
 			pos_x[body2w] += TIME_STEP * vel_x[body2w];
 			pos_y[body2w] += TIME_STEP * vel_y[body2w];
