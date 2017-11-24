@@ -237,16 +237,15 @@ int main()
 				status |= clSetKernelArg(kernel, 5, sizeof(cl_mem), &dev_n);
 				status |= clSetKernelArg(kernel, 6, sizeof(cl_mem), &dev_iters);
 
+				if (status != CL_SUCCESS) {
+					fprintf(stderr, "Kernal Arg Failed\n");
+					int a;
+					cin >> a;
+					return status;
+				}
+
 				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
-
-					if (status != CL_SUCCESS) {
-						fprintf(stderr, "Kernal Arg Failed\n");
-						int a;
-						cin >> a;
-						return status;
-					}
-
 					// Enqueue the kernel for execution
 					status = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, nullptr, &GLOBAL_WORK_SIZE, &LOCAL_WORK_SIZE, 0, nullptr, nullptr);
 

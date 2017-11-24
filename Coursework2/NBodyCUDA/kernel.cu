@@ -73,8 +73,8 @@ __global__ void n_body(float2* pos, float2* vel, float* mass, unsigned int* n, u
 			vel[body2w] = vel[body2];
 			pos[body2w] = pos[body2];
 
-			vel[body2w].x += TIME_STEP * (fx / mass[i]);
-			vel[body2w].y += TIME_STEP * (fy / mass[i]);
+			vel[body2w].x += TIME_STEP * (fx / mass[idx]);
+			vel[body2w].y += TIME_STEP * (fy / mass[idx]);
 
 			pos[body2w].x += TIME_STEP * vel[body2w].x;
 			pos[body2w].y += TIME_STEP * vel[body2w].y;
@@ -88,22 +88,6 @@ __global__ void n_body(float2* pos, float2* vel, float* mass, unsigned int* n, u
 
 void initBodies(float2* pos, float2* vel, float* mass, unsigned int N)
 {
-	/*
-	float* random_pos;
-	float* random_mass;
-	cudaMallocHost((void **)&random_pos,  (sizeof(float) * N) * 2);
-	cudaMallocHost((void **)&random_mass, (sizeof(float) * N));
-
-	curandGenerator_t rnd;
-	curandCreateGenerator(&rnd, CURAND_RNG_PSEUDO_DEFAULT);//CURAND_RNG_QUASI_SOBOL32);
-	curandSetQuasiRandomGeneratorDimensions(rnd, 1);
-	curandSetGeneratorOrdering(rnd, CURAND_ORDERING_PSEUDO_DEFAULT);//CURAND_ORDERING_QUASI_DEFAULT);
-
-	curandGenerateUniform(rnd, (float*)random_pos, N * 2);
-	curandGenerateUniform(rnd, (float*)random_mass, N);
-
-	curandDestroyGenerator(rnd);
-	*/
 	for (int i = 1; i < N; i++)
 	{
 		pos[i].x = 2.0f * (rand() / (double)RAND_MAX) - 1.0f;//(2.0f * random_pos[i])     - 1.0f; // Init at position between -1 : 1
@@ -128,9 +112,9 @@ int main()
 	data.open("data.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 1000 }; //100, 250, 500, 1000, 5000 };
-	vector<int> chunks_vec = { 10 };//, 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 1;
+	vector<int> bodies_vec = { 512, 1024, 5120 };
+	vector<int> chunks_vec = { 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 10;
 
 	for (int & bodies : bodies_vec)
 	{
@@ -143,7 +127,7 @@ int main()
 				// Variables to change
 				const unsigned int N = bodies;
 				const unsigned int ITERS = 1000;							// Number of simulation iterations.
-				const unsigned int THREADS = 64;							// Number of threads per block.
+				const unsigned int THREADS = 512;							// Number of threads per block.
 				const unsigned int BLOCKS = ceil(N / THREADS) * THREADS;			// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;					// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;   // Calculated size of iteration chunks
@@ -199,7 +183,7 @@ int main()
 				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
 					// Execute Kernel
-					n_body << <BLOCKS, THREADS >> > (dev_pos, dev_vel, dev_mass, dev_n, dev_iters);
+					n_body <<<BLOCKS, THREADS>>> (dev_pos, dev_vel, dev_mass, dev_n, dev_iters);
 
 					// Wait for kernal to complete
 					cudaDeviceSynchronize();
@@ -208,8 +192,8 @@ int main()
 					cudaMemcpy(&host_pos[0], dev_pos, (sizeof(float2) * N) * ITER_CHUNK_SIZE, cudaMemcpyDeviceToHost);
 					cudaMemcpy(&host_vel[0], dev_vel, (sizeof(float2) * N) * ITER_CHUNK_SIZE, cudaMemcpyDeviceToHost);
 
+					/*
 					// Write to file
-					
 					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
 					{
 						for (int k = 0; k < N; k++)
@@ -219,7 +203,18 @@ int main()
 							data << i << "," << host_pos[j].x << "," << host_pos[j].y << "," << host_vel[j].x << "," << host_vel[j].y << "," << host_mass[k] << endl;
 						}
 					}
-					
+					*/
+
+					// Copy final iteration to first iteration
+					for (int i = 0; i < N; i++)
+					{
+						host_pos[i] = host_pos[i + ((ITER_CHUNK_SIZE - 1) * N)];
+						host_vel[i] = host_vel[i + ((ITER_CHUNK_SIZE - 1) * N)];
+					}
+		
+					//Copy memory from host to device
+					cudaMemcpy(dev_pos, &host_pos[0], (sizeof(float2) * N), cudaMemcpyHostToDevice);
+					cudaMemcpy(dev_vel, &host_vel[0], (sizeof(float2) * N), cudaMemcpyHostToDevice);
 				}
 
 				auto end = system_clock::now();
