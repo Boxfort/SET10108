@@ -9,10 +9,10 @@
 using namespace std;
 using namespace std::chrono;
 
-typedef struct { double x, y, vx, vy, mass, radius; bool dead; } Body;
+typedef struct { double x, y, vx, vy, mass; } Body;
 
-const unsigned int N = 100;
-const unsigned int ITERS = 5000;
+const unsigned int N = 5120;
+const unsigned int ITERS = 1000;
 const double G = 6.674e-11;
 const double TIME_STEP = 1;
 const double DAMPENING = 1e-9;
@@ -22,7 +22,6 @@ const double PI = 3.14159265358979323846;
 
 void initBodies(Body* bodies)
 {
-#pragma omp parallel for schedule(dynamic)
 	for (int i = 1; i < N; i++)
 	{
 		bodies[i].x = 2.0f * (rand() / (double)RAND_MAX) - 1.0f; // Init at position between -1 : 1
@@ -30,7 +29,6 @@ void initBodies(Body* bodies)
 		bodies[i].vx = 0;
 		bodies[i].vy = 0;
 		bodies[i].mass = rand() % (500 - 100 + 1) + 100;
-		bodies[i].dead = false;
 	}
 
 	bodies[0].x = 0;
@@ -38,22 +36,17 @@ void initBodies(Body* bodies)
 	bodies[0].vx = 0.0;
 	bodies[0].vy = 0.0;
 	bodies[0].mass = 3000;
-	bodies[0].dead = false;
 }
 
 void calculateForces(Body* bodies)
 {
-	#pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < N; i++) 
 	{
-		if (bodies[i].dead) { continue; }
-
 		double fx = 0.0, fy = 0.0;
 
 		for (int j = 0; j < N; j++) 
 		{
 			if (i == j) { continue; }
-			if (bodies[j].dead) { continue; }
 
 			double dx = bodies[j].x - bodies[i].x;
 			double dy = bodies[j].y - bodies[i].y;
@@ -73,6 +66,7 @@ void calculateForces(Body* bodies)
 	}
 }
 
+/*
 void mergeBodies(Body* bodies)
 {
 	for (int i = 0; i < N; i++)
@@ -104,6 +98,7 @@ void mergeBodies(Body* bodies)
 		}
 	}
 }
+*/
 
 int main()
 {
@@ -112,34 +107,40 @@ int main()
 	int dataSize = sizeof(Body) * N;   // Total size of data
 	Body *p = (Body*)malloc(dataSize); // Pointer to array of bodies
 
-	initBodies(p);
+	ofstream file, timings;
 
-	auto start = system_clock::now();
-
-	ofstream file;
 	file.open("data.csv");
+	timings.open("SequentialTiming.csv");
 
-	for (unsigned int i = 0; i < ITERS; i++)
+	unsigned int timing_iterations = 50;
+
+	for (int t = 0; t < timing_iterations; t++)
 	{
-		//Todo timing
-		calculateForces(p);
-		mergeBodies(p);
+		initBodies(p);
 
-		for (int j = 0; j < N; j++)
+		auto start = system_clock::now();
+
+		for (unsigned int i = 0; i < ITERS; i++)
 		{
-			file << i << "," << p[j].x << "," << p[j].y << "," << p[j].vx << "," << p[j].vy << "," << p[j].mass << endl;
+			calculateForces(p);
+
+			//for (int j = 0; j < N; j++)
+			//{
+			//	file << i << "," << p[j].x << "," << p[j].y << "," << p[j].vx << "," << p[j].vy << "," << p[j].mass << endl;
+			//}
+
+			//auto elapsed = system_clock::now() - start;
+			//auto remaining = duration_cast<seconds>((elapsed / (i+1)) * (ITERS - i + 1)).count();
+
+			cout << t << " | Iteration " << i << " of " << ITERS << endl; // " Time Remaining: " << remaining << " Seconds." << "\r";
 		}
 
-		auto elapsed = system_clock::now() - start;
-		auto remaining = duration_cast<seconds>((elapsed / (i+1)) * (ITERS - i + 1)).count();
-
-		cout << "Iteration " << i << " of " << ITERS << " Time Remaining: " << remaining << " Seconds." << "\r";
+		auto end = system_clock::now();
+		timings << duration_cast<milliseconds>(end - start).count() << ",";
 	}
 
-	auto end = system_clock::now();
-	duration_cast<milliseconds>(end - start).count();
-
 	file.close();
+	timings.close();
 
 	return 0;
 }

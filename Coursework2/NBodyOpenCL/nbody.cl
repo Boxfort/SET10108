@@ -27,7 +27,7 @@ __kernel void nbody(__global float* pos_x, __global float* pos_y, __global float
 				float dy = pos_y[body1] - pos_y[body2];
 				float distance = sqrt(dx*dx + dy*dy + DAMPENING);
 				
-				float force = G * (mass[body1] * (mass[body2] / distance));
+				float force = G * (mass[idx] * (mass[j] / distance));
 
 				fx += force * (dx / distance);
 				fy += force * (dy / distance);

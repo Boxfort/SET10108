@@ -130,27 +130,27 @@ int main()
 {
 	ofstream file, data;
 
-	file.open("OpenCLTimings.csv");
+	file.open("OpenCLTimingsThreads2.csv");
 	data.open("data.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> bodies_vec = { 512, 1024, 5120};
-	vector<int> chunks_vec = { 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 10;
+	vector<int> threads_vec = { 1024 };//1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+	vector<int> chunks_vec = { 1000 };//2, 5, 10, 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 50;
 
-	for (int & bodies : bodies_vec)
+	for (int & threads : threads_vec)
 	{
 		for (int & chunks : chunks_vec)
 		{
-			file << bodies << "," << chunks << ",";
+			file << threads << "," << chunks << ",";
 
 			for (int t = 0; t < timing_iterations; t++)
 			{
 
 				// Variables to change
-				const unsigned int N = bodies;
+				const unsigned int N = 5120;
 				const unsigned int ITERS = 1000;												// Number of simulation iterations.
-				const size_t LOCAL_WORK_SIZE = 512;												// Number of threads per block.
+				const size_t LOCAL_WORK_SIZE = threads; //64;												// Number of threads per block.
 				const size_t GLOBAL_WORK_SIZE = ceil(N / LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;										// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;						// Calculated size of iteration chunks
@@ -300,7 +300,7 @@ int main()
 
 				auto end = system_clock::now();
 				auto total = end - start;
-				cout << "Bodies: " << N << " Chunks: " << ITER_CHUNKS << " Time Taken: " << duration_cast<milliseconds>(total).count() << "ms" << endl;
+				cout << "Threads: " << threads << " Chunks: " << ITER_CHUNKS << " Time Taken: " << duration_cast<milliseconds>(total).count() << "ms" << endl;
 				file << duration_cast<milliseconds>(total).count() << ",";
 
 				// Free mallocs
