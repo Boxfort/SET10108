@@ -112,6 +112,7 @@ cl_program load_program(const string &filename, cl_context &context, cl_device_i
 
 void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y , float* mass, unsigned int N)
 {
+	// Initialise every body with a random location and mass and no velocity.
 	for (int i = 0; i < N; i++)
 	{
 		pos_x[i] = 2.0f * (rand() / (double)RAND_MAX) - 1.0f;//(2.0f * random_pos[i])     - 1.0f; // Init at position between -1 : 1
@@ -121,6 +122,7 @@ void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y , float* 
 		mass[i] = rand() % (500 - 100 + 1) + 100; //static_cast<int>(random_mass[i]) % (500 - 100 + 1) + 100;
 	}
 
+	// Create a large body in the center.
 	pos_x[0] = 0;
 	pos_y[0] = 0;
 	mass[0] = 4000;
@@ -130,13 +132,13 @@ int main()
 {
 	ofstream file, data;
 
-	file.open("OpenCLTimingsThreads2.csv");
+	file.open("OpenCLTimingsThreadsFixed.csv");
 	data.open("data.csv");
 	file << "BODIES,CHUNKS,TIME" << endl;
 
-	vector<int> threads_vec = { 1024 };//1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
-	vector<int> chunks_vec = { 1000 };//2, 5, 10, 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 50;
+	vector<int> threads_vec = { 32 }; //, 64 };
+	vector<int> chunks_vec = { 128 };//, 5, 10, 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 1;
 
 	for (int & threads : threads_vec)
 	{
@@ -148,10 +150,10 @@ int main()
 			{
 
 				// Variables to change
-				const unsigned int N = 5120;
+				const unsigned int N = 128;
 				const unsigned int ITERS = 1000;												// Number of simulation iterations.
 				const size_t LOCAL_WORK_SIZE = threads; //64;												// Number of threads per block.
-				const size_t GLOBAL_WORK_SIZE = ceil(N / LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
+				const size_t GLOBAL_WORK_SIZE = N; //ceil(N / LOCAL_WORK_SIZE) * LOCAL_WORK_SIZE;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;										// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;						// Calculated size of iteration chunks
 
@@ -265,7 +267,7 @@ int main()
 					clEnqueueReadBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
 					clEnqueueReadBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
 
-					/*
+					
 					// Write to file
 					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
 					{
@@ -277,23 +279,36 @@ int main()
 
 						}
 					}
-					*/
 					
-					// TODO: Copy final iteration to first iteration
+					
+					// Copy final iteration to first iteration
 					for (int i = 0; i < N; i++)
 					{
 						host_pos_x[i] = host_pos_x[i + ((ITER_CHUNK_SIZE-1) * N)];
 						host_pos_y[i] = host_pos_y[i + ((ITER_CHUNK_SIZE-1) * N)];
 						host_vel_x[i] = host_vel_x[i + ((ITER_CHUNK_SIZE-1) * N)];
 						host_vel_y[i] = host_vel_y[i + ((ITER_CHUNK_SIZE-1) * N)];
+
+						for (int j = 0; j < ITER_CHUNK_SIZE - 1; j++)
+						{
+							host_vel_x[i + ITER_CHUNK_SIZE + j] = 0;
+							host_vel_y[i + ITER_CHUNK_SIZE + j] = 0;
+						}
 					}
 					
 
 					// Copy host data to device data
-					status = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N), host_pos_x, 0, nullptr, nullptr);
-					status |= clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N), host_pos_y, 0, nullptr, nullptr);
-					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N), host_vel_x, 0, nullptr, nullptr);
-					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N), host_vel_y, 0, nullptr, nullptr);
+					status = clEnqueueWriteBuffer(cmd_queue, dev_pos_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_x, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_pos_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_pos_y, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_x, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_x, 0, nullptr, nullptr);
+					status |= clEnqueueWriteBuffer(cmd_queue, dev_vel_y, CL_TRUE, 0, (sizeof(float) * N) * ITER_CHUNK_SIZE, host_vel_y, 0, nullptr, nullptr);
+				
+					if (status != CL_SUCCESS) {
+						fprintf(stderr, "ReWrite Buffer Failed\n");
+						int a;
+						cin >> a;
+						return status;
+					}
 				}
 
 				data.close();

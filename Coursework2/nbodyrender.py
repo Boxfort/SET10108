@@ -6,15 +6,16 @@ import numpy, cv2
 import csv
 import math
 
-FILENAME = "NBodyCuda/data.csv"
-#FILENAME = "NBodyOpenCL/data.csv"
+#FILENAME = "Coursework2/data.csv"
+#FILENAME = "NBodyCuda/data.csv"
+FILENAME = "NBodyOpenCL/data.csv"
 IMAGE_PREFIX = "Images/IMG"
 IMAGE_TYPE = "PNG"
 IMAGE_DIM = (1920, 1080)
 MODE = "RGB"
 ELLIPSE_SIZE = 0.5
 VEL_MUL = 2.0
-N = 5120
+N = 128
 IMAGES = 1000
 PI = 3.14159265358979323846
 
@@ -30,7 +31,7 @@ if __name__ == '__main__':
     image = Image.new(MODE, IMAGE_DIM)
     draw = ImageDraw.Draw(image)
 
-    video = cv2.VideoWriter("nbodyCUDAtesty.mp4", cv2.VideoWriter_fourcc(*'DIVX'), 100, IMAGE_DIM)
+    video = cv2.VideoWriter("nbodyOCL.mp4", cv2.VideoWriter_fourcc(*'DIVX'), 100, IMAGE_DIM)
     fnt = ImageFont.truetype('C:/Users/Jack/Documents/Curse/Minecraft/Install/runtime/jre-x64/1.8.0_25/lib/fonts/LucidaTypewriterRegular.ttf', 10)
 
     count = 0

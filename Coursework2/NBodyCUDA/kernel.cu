@@ -50,31 +50,36 @@ __global__ void n_body(float* pos_x, float* vel_x, float* pos_y, float* vel_y, f
 	{
 		for (int i = 0; i < iterations[0]; i++)
 		{
+			// Previous iterations body.
 			int body2 = idx + ((i+offset) * n[0]);
+			// Current iterations body
 			int body2w = idx + (i * n[0]);
 
-			// For each body
 			for (int j = 0; j < n[0]; j++)
 			{
-				//if (idx == j) { continue; }
-
+				// Previous iteration body
 				int body1 = j + ((i + offset) * n[0]);
 
+				// Calculate distances between bodies
 				float dx = pos_x[body1] - pos_x[body2];
 				float dy = pos_y[body1] - pos_y[body2];
 				float distance = sqrt(dx*dx + dy*dy + DAMPENING);
 				
+				// Calulate forces on bodies based on mass and distance
+
 				float force = G * (mass[idx] * (mass[j] / distance));
 
 				fx += force * (dx / distance);
 				fy += force * (dy / distance);
 			}
 
+			// Copy previous iteration state to this iteration
 			vel_x[body2w] = vel_x[body2];
 			pos_x[body2w] = pos_x[body2];
 			vel_y[body2w] = vel_y[body2];
 			pos_y[body2w] = pos_y[body2];
 
+			// Move bodies based on force acting upon them.
 			vel_x[body2w] += TIME_STEP * (fx / mass[idx]);
 			vel_y[body2w] += TIME_STEP * (fy / mass[idx]);
 
@@ -83,6 +88,7 @@ __global__ void n_body(float* pos_x, float* vel_x, float* pos_y, float* vel_y, f
 
 			__syncthreads();
 
+			//After the first iteration start referencing previous iterations state
 			offset = -1;
 		}
 	}
@@ -90,6 +96,8 @@ __global__ void n_body(float* pos_x, float* vel_x, float* pos_y, float* vel_y, f
 
 void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y, float* mass, unsigned int N)
 {
+	// Initialise every body with a random location and mass and no velocity.
+
 	for (int i = 0; i < N; i++)
 	{
 		pos_x[i] = 2.0f * (rand() / (double)RAND_MAX) - 1.0f;//(2.0f * random_pos[i])     - 1.0f; // Init at position between -1 : 1
@@ -98,7 +106,7 @@ void initBodies(float* pos_x, float* pos_y, float* vel_x, float* vel_y, float* m
 		vel_y[i] = 0;
 		mass[i] = rand() % (500 - 100 + 1) + 100; //static_cast<int>(random_mass[i]) % (500 - 100 + 1) + 100;
 	}
-
+	// Create a large body in the center.
 	pos_x[0] = 0;
 	pos_y[0] = 0;
 	mass[0] = 4000;
@@ -112,9 +120,9 @@ int main()
 	data.open("data.csv");
 	file << "THREADS,CHUNKS,TIME" << endl;
 
-	vector<int> threads_vec = { 32, 64 };
-	vector<int> chunks_vec = { 2, 5, 10, 25, 50, 100, 500, 1000 };
-	unsigned int timing_iterations = 50;
+	vector<int> threads_vec = { 32 }; //, 64 };
+	vector<int> chunks_vec = { 2 };//, 5, 10, 25, 50, 100, 500, 1000 };
+	unsigned int timing_iterations = 1;
 
 	for (int & threads : threads_vec)
 	{
@@ -125,17 +133,17 @@ int main()
 			for (int t = 0; t < timing_iterations; t++)
 			{
 				// Variables to change
-				const unsigned int N = 5120;
+				const unsigned int N = 128;
 				const unsigned int ITERS = 1000;							// Number of simulation iterations.
-				const unsigned int THREADS = threads;							// Number of threads per block.
-				const unsigned int BLOCKS = ceil(N / THREADS) * THREADS;			// Number of blocks required to satisfy N bodies with THREADS threads per block.
+				const unsigned int THREADS = threads;						// Number of threads per block.
+				const unsigned int BLOCKS = ceil(N / THREADS) * THREADS;	// Number of blocks required to satisfy N bodies with THREADS threads per block.
 				const unsigned int ITER_CHUNKS = chunks;					// Number of chunks to seperate iterations into
 				const unsigned int ITER_CHUNK_SIZE = ITERS / ITER_CHUNKS;   // Calculated size of iteration chunks
 
 
 				//Init CUDA - select device
 				cudaSetDevice(0);
-				//cuda_info();
+				cuda_info();
 
 				// Declare host memory 
 				float		 *host_pos_x;		// out
@@ -180,8 +188,6 @@ int main()
 
 				auto start = system_clock::now();
 
-				auto start1 = system_clock::now();
-
 				//Copy memory from host to device
 				cudaMemcpy(dev_pos_x, &host_pos_x[0], (sizeof(float) * N) * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
 				cudaMemcpy(dev_vel_x, &host_vel_x[0], (sizeof(float) * N)  * ITER_CHUNK_SIZE, cudaMemcpyHostToDevice);
@@ -191,12 +197,6 @@ int main()
 				cudaMemcpy(dev_n, &host_n[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
 				cudaMemcpy(dev_iters, &host_iters[0], (sizeof(unsigned int)), cudaMemcpyHostToDevice);
 
-				auto end1 = system_clock::now();
-				auto total1 = end1 - start1;
-				//cout << "Host to device Time Taken: " << duration_cast<milliseconds>(total1).count() << "ms" << endl;
-
-
-				// TODO: Call Kernel once, then call with dev_memory
 				for (unsigned int i = 0; i < ITER_CHUNKS; i++)
 				{
 					// Execute Kernel
@@ -215,7 +215,7 @@ int main()
 					if(err != 0)
 						cout << cudaGetErrorName(err) << endl;
 
-					/*
+					
 					// Write to file
 					for (int i = 0; i < ITER_CHUNK_SIZE; i++)
 					{
@@ -226,7 +226,7 @@ int main()
 							data << i << "," << host_pos_x[j] << "," << host_pos_y[j] << "," << host_vel_x[j] << "," << host_vel_y[j] << "," << host_mass[k] << endl;
 						}
 					}
-					*/
+					
 
 					// Copy final iteration to first iteration
 					for (int i = 0; i < N; i++)
@@ -235,7 +235,14 @@ int main()
 						host_vel_x[i] = host_vel_x[i + ((ITER_CHUNK_SIZE - 1) * N)];
 						host_pos_y[i] = host_pos_y[i + ((ITER_CHUNK_SIZE - 1) * N)];
 						host_vel_y[i] = host_vel_y[i + ((ITER_CHUNK_SIZE - 1) * N)];
+
+						for (int j = 0; j < ITER_CHUNK_SIZE-1; j++)
+						{
+							host_vel_x[i + ITER_CHUNK_SIZE + j] = 0;
+							host_vel_y[i + ITER_CHUNK_SIZE + j] = 0;
+						}
 					}
+
 
 					//Copy memory from host to device
 					cudaMemcpy(dev_pos_x, &host_pos_x[0], (sizeof(float) * N), cudaMemcpyHostToDevice);
@@ -249,7 +256,7 @@ int main()
 				cout << "Threads: " << THREADS << " Chunks: " << ITER_CHUNKS << " Time Taken: " << duration_cast<milliseconds>(total).count() << "ms" << endl;
 				file << duration_cast<milliseconds>(total).count() << ",";
 
-
+				// Free allocated memory.
 				cudaFree(dev_pos_x);
 				cudaFree(dev_vel_x);
 				cudaFree(dev_pos_y);
